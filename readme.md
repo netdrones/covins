@@ -275,11 +275,17 @@ We provide COVINS also as a Docker implementation. A guide how to install docker
 
 **NOTE:** The provided docker implementation will **not build** if you have previously built your cloned version of COVINS in a catkin workspace using the instructions provided above. If you want to use the docker implementation, please **perform the docker build with a freshly cloned version of COVINS**
 
-Build the docker file using the Make file provided in the `docker` folder. Provide the number of jobs `make` and `catkin build` should use. This can take a while. If the build fails try again with a reduced number of jobs value.
+Build the docker file using the Make file provided in the `docker` folder.
+Provide the number of jobs `make` and `catkin build` should use. This can take
+a while. If the build fails try again with a reduced number of jobs value.
 
-* ```make build NR_JOBS=14```
+```sh
+# build with half the processors on the machine
+make build NR_JOBS=$(($(nproc/2)))
+```
     
 ### Running the Docker Image
+
 The docker image can be used to run different parts of COVINS (e.g. server, ORB-SLAM3 front-end, ...).
 
 #### ROSCORE

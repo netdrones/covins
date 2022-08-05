@@ -5,11 +5,12 @@ FROM osrf/ros:melodic-desktop-bionic
 ENV CATKIN_WS=/root/covins_ws
 
 # fix keys see (https://github.com/googlecartographer/cartographer_ros/issues/1323)
-RUN apt-key adv --keyserver 'hkp://keyserver.ubuntu.com:80' --recv-key C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654
-RUN apt-key del 421C365BD9FF1F717815A3895523BAEEB01FA116
+RUN apt-key adv --keyserver 'hkp://keyserver.ubuntu.com:80' \
+        --recv-key C1CF6E31E6BADE8868B172B4F42ED6FBAB17C654 && \
+    apt-key del 421C365BD9FF1F717815A3895523BAEEB01FA116
 
 # install ros packages
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
                       wget \
                       ros-melodic-desktop-full \
                       ros-melodic-serial \
@@ -27,12 +28,13 @@ RUN apt-get update && apt-get install -y \
                       cgdb \
                       && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && apt-get upgrade -y
+# not sure why this is here
+RUN apt-get update && apt-get upgrade -y && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # -------------------------------------------
 # Libraries for building COVINS
 # -------------------------------------------
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
                       cmake \
 					  doxygen \
                       libgoogle-glog-dev \
@@ -42,7 +44,10 @@ RUN apt-get update && apt-get install -y \
 					  libvtk6-dev \
 					  libv4l-dev \
                       libomp-dev \
-                      libglew-dev
+                      unzip \
+                      libglew-dev && \
+    rm -rf /var/lib/apt/lists/*
+
 
 #--------------------------
 # BUILD COVINS

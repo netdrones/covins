@@ -4,7 +4,7 @@
 # so NR_JOBS is the number of processors in the machine given by `nproc`
 NR_JOBS ?= $(shell nproc)
 #NR_JOBS ?= 5
-TAG ?= 0.0.3
+TAG ?= v0.0.3
 
 # registry can be docker.io, ghcr.io, gcr.io for exmaple
 # REGISTRY ?= docker.io

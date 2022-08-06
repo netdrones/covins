@@ -59,7 +59,7 @@ jobs:
       id: meta
       uses: docker/metadata-action@v4
       with:
-        images: ghcr.io/${{GITHUB_REPOSITORY}}:latest
+        images: ${{env.IMAGE_REPOSITORY}}/${{github.repository}}
         tags: |
             type=schedule
             type=ref,event=branch

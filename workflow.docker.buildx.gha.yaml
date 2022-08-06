@@ -59,7 +59,7 @@ jobs:
       id: meta
       uses: docker/metadata-action@v4
       with:
-        images: ${{env.IMAGE_REPOSITORY}}/${{github.repository}}:latest
+        images: ${{env.IMAGE_REPOSITORY}}/${{github.repository}}
         tags: |
             type=schedule
             type=ref,event=branch

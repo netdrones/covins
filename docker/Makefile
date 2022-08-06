@@ -4,6 +4,7 @@
 # so NR_JOBS is the number of processors in the machine given by `nproc`
 NR_JOBS ?= $(shell nproc)
 #NR_JOBS ?= 5
+TAG ?= 0.0.3
 
 # registry can be docker.io, ghcr.io, gcr.io for exmaple
 # REGISTRY ?= docker.io
@@ -69,6 +70,12 @@ debug:
 		$(REGISTRY)/$(ORG)/$(IMAGE):latest && \
 	docker push --all-tags $(REGISTRY)/$(ORG)/$(IMAGE) && \
 	docker buildx use default
+
+## tag: tag current presentation
+.PHONY: tag
+tag:
+	git tag -a $(TAG) -m "tagged with $(TAG)" && \
+	git push --tags
 
 .PHONY: clean
 clean:

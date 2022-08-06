@@ -5,24 +5,27 @@
 
 name: Build docker buildx image
 
-env:
-  IMAGE_REGISTRY: ghcr.io
-  IMAGE_USER: ${{ github.repository_owner }}
-  IMAGE_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-# set for docker
-#    IMAGE_REGISTRY: docker.io
-#    IMAGE_USER: ${{ secrets.DOCKER_USERNAME }}
-#    IMAGE_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-
 # yamllint disable-line rule:truthy
 on:
   push:
     branches:
       - main
       - 'rich-*'
+    tags:
+      - 'v*'
+
   pull_request:
     branches:
       - main
+
+env:
+  # normal location
+  # DOCKERFILE: Dockerfile
+  DOCKERFILE: ./docker/Dockerfile
+  TEST_TAG: ${{github.repository}}:test
+  # https://github.com/docker/build-push-action/issues/557
+  # failed at 5, failed at 2
+  BUILD_ARGS: NR_JOBS=1
 
 # need permissions to write to github repo artifacts
 permissions:
@@ -40,46 +43,69 @@ jobs:
       id: buildx
       uses: docker/setup-buildx-action@v1
 
-    # https://docs.docker.com/docker-hub/access-tokens/
     # https://docs.github.com/en/actions/security-guides/encrypted-secrets
-    - name: Login to registry
+    - name: Login to GitHub registry
       if: github.event_name != 'pull_request'
       uses: docker/login-action@v1
       with:
-        registry: ${{ env.IMAGE_REGISTRY }}
-        username: ${{ env.IMAGE_USER }}
-        password: ${{ env.IMAGE_PASSWORD }}
-    # this for docker.io registry
-    # create a Dockerhub access Token and put into github secret
-    # - name: Login to Docker Hub
-    #   uses: docker/login-action@v1
-    #   with:
+        registry: ghcr.io
+        username: ${{ github.repository_owner }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
+    # https://docs.docker.com/docker-hub/access-tokens/
+    # you need to add the docker Personal Access Token to the secrets
+    - name: Login to Docker Hub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PERSONAL_ACCESS_TOKEN }}
+
+            # type=semvar,pattern={{major}}
+            # type=semvar,pattern={{major}.{{minor}}
+            # type=semvar,pattern={{major}}.{{minor}}.{{patch}}
+            # type=semvar,pattern={{version}}
+    # https://github.com/docker/build-push-action/blob/master/TROUBLESHOOTING.md
     - name: Docker meta tags
       id: meta
       uses: docker/metadata-action@v4
       with:
-        images: ${{env.IMAGE_REGISTRY}}/${{github.repository}}:latest
+        # use different registry names here to push to different registries
+        images: |
+          ${{github.repository}}
+          ghcr.io/${{github.repository}}
         tags: |
             type=schedule
             type=ref,event=branch
             type=ref,event=pr
-            type=semvar,pattern={{version}}
-            type=semvar,pattern={{major}}
-            type=semvar,pattern={{major}.{{minor}}
             type=sha
+            latest
 
-    - name: Build image and push
-      uses: docker/build-push-action@v2
+    # cannot do multi-platform buildslocally
+    - name: Build image for test
+      uses: docker/build-push-action@v3
       with:
         context: .
-        file: ./Dockerfile
+        file: ${{ env.DOCKERFILE }}
+        build-args: ${{ env.BUILD_ARGS }}
+        # platforms: linux/amd64,linux/arm64
+        load: true
+        tags: ${{ env.TEST_TAG }}
+
+    - name: Test docker image runs
+      run: |
+        docker run --rm ${{ env.TEST_TAG }}
+
+    - name: Push image to registries (using cached build)
+      uses: docker/build-push-action@v3
+      with:
+        context: .
+        # for covins how parallel is the build too much and it fails
+        build-args: ${{ env.BUILD_ARGS }}
+        file: ${{ env.DOCKERFILE }}
         platforms: linux/amd64,linux/arm64
         push: ${{ github.event_name != 'pull_request' }}
-        #tags: |
-          # ${{github.repository}},
-          # ${{github.repository}}:${{github.sha}},
-          # ${{github.repository}}:latest
-        # instead of manual tags use the metadata-action to generate them
+        # this is the step that creates the correct image names from above
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
+        # instead of manual tgs use the metadata-action to generate them
+        #tags: ${{GITHUB_REPOSITORY}}:${{GITHUB_REF_NAME}}, ${{GITHUB_REPOSITORY}}:${{GITHUB_SHA}}

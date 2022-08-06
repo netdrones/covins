@@ -1,16 +1,19 @@
-# set NR_JOBS to half the processors by default
 
 # assume docker gets half the cpus on the bare metal and put 2 jobs per core
 # so NR_JOBS is the number of processors in the machine given by `nproc`
-NR_JOBS ?= $(shell nproc)
-#NR_JOBS ?= 5
-TAG ?= 0.0.3
+#NR_JOBS ?= $(shell nproc)
+# the build can fail with too many jobs in CC compilation, so 
+# this is set to half the cores as a rough guess
+# set NR_JOBS to half the processors by default
+SHELL=/bin/bash
+NR_JOBS ?= $$(($$(nproc)/2))
+TAG ?= v0.0.3-rich
 
 # registry can be docker.io, ghcr.io, gcr.io for exmaple
 # REGISTRY ?= docker.io
 REGISTRY ?= ghcr.io
 ORG ?= netdrones
-IMAGE ?= covins
+IMAGE ?= covins-rich
 # set to the sha of the current commit
 TAG ?= $(shell git rev-parse HEAD)
 # multiplatform builds only work with buildx
@@ -33,9 +36,9 @@ build:
 			--build-arg NR_JOBS=$(NR_JOBS) \
 			-f ./Dockerfile \
 			.. && \
-	@docker tag $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
+	docker tag $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
 		$(REGISTRY)/$(ORG)/$(IMAGE):latest && \
-	@docker push --all-tags $(REGISTRY)/$(ORG)/$(IMAGE)
+	docker push --all-tags $(REGISTRY)/$(ORG)/$(IMAGE)
 
 ## buildx: build multiple architecture in single image
 .PHONY: buildx

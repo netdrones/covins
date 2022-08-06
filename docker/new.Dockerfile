@@ -43,7 +43,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
                       libsuitesparse-dev="1:5.1.*" \
 					  libyaml-cpp-dev="0.5.*" \
 					  libvtk6-dev="6.3.*" \
-					  libv4l-dev="1.14.*" \
+					  libv4l-dev=".14.*" \
                       libomp-dev="5.0.*" \
                       unzip="6.0*" \
                       gcc="4:7.4.*" \
@@ -86,3 +86,18 @@ RUN cd src && \
     cd $CATKIN_WS/devel/lib && \
     ldd libcv_bridge.so | grep opencv_core && \
     catkin build -j $NR_JOBS ORB_SLAM3
+
+# Build Covins Ros node with layers and WORKDIR and fix for last conditional
+WORKDIR $CATKIN_WS
+WORKDIR $CATKIN_WS/src
+RUN git clone -b melodic https://github.com/ros-perception/vision_opencv.git
+WORKDIR $CATKIN_WS/src/vision_opencv/cv_bridge
+RUN sed -i '4d' CMakeLists.txt && \
+    sed -i '3afind_package(catkin REQUIRED COMPONENTS rosconsole sensor_msgs opencv3_catkin)' CMakeLists.txt && \
+    catkin build -j $NR_JOBS cv_bridge
+WORKDIR $CATKIN_WS/devel/lib
+# need pipefail in case ldd failes
+RUN set -o pipefail && \
+    if ldd libcv_bridge.so | grep -q opencv_core; then \
+        catkin build -j $NR_JOBS ORB_SLAM3; \
+    fi

@@ -59,7 +59,7 @@ jobs:
       id: meta
       uses: docker/metadata-action@v4
       with:
-        images: ghcr.io/${{github.repository}}:latest
+        images: ${{env.IMAGE_REGISTRY}}/${{github.repository}}:latest
         tags: |
             type=schedule
             type=ref,event=branch
@@ -67,7 +67,6 @@ jobs:
             type=semvar,pattern={{version}}
             type=semvar,pattern={{major}}
             type=semvar,pattern={{major}.{{minor}}
-            type=semvar,pattern={{major}}.{{minor}}.{{patch}}
             type=sha
 
     - name: Build image and push

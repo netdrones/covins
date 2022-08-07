@@ -80,13 +80,14 @@ jobs:
             type=sha
             latest
 
-    # cannot do multi-platform buildslocally
+    # https://github.com/docker/build-push-action/blob/master/docs/advanced/test-before-push.md
     - name: Build image for test
       uses: docker/build-push-action@v3
       with:
         context: .
         file: ${{ env.DOCKERFILE }}
         build-args: ${{ env.BUILD_ARGS }}
+        # cannot do multi-platform because runs out of memory
         # platforms: linux/amd64,linux/arm64
         load: true
         tags: ${{ env.TEST_TAG }}
@@ -102,7 +103,9 @@ jobs:
         # for covins how parallel is the build too much and it fails
         build-args: ${{ env.BUILD_ARGS }}
         file: ${{ env.DOCKERFILE }}
-        platforms: linux/amd64,linux/arm64
+        # this currently fails probably too much memory used as of Aug 2022
+        # see https://github.com/docker/build-push-action/issues/621
+        # platforms: linux/amd64,linux/arm64
         push: ${{ github.event_name != 'pull_request' }}
         # this is the step that creates the correct image names from above
         tags: ${{ steps.meta.outputs.tags }}

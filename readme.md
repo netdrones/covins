@@ -64,6 +64,7 @@ If you use COVINS in an academic work, please cite:
 
 <a name="setup"></a>
 ## 3 Basic Setup
+
 This section explains how you can build the COVINS server back-end, as well as the provided version of the ORB-SLAM3 front-end able to communicate with the back-end. COVINS was developed under Ubuntu *18.04*, and we provide installation instructions for *18.04* as well as *20.04*. Note that we also provide a [Docker implementation](#docker) for simplified deployment of COVINS.
 
 **Note**: Please pay attention to the ```CMAKE_BUILD_TYPE```. Particularly, building parts of the code with ```march=native``` can cause problems on some machines.
@@ -285,14 +286,17 @@ failure is typically something deep in catkins involving a mysterious error in
 opengv complication where the gcc compiler gives up. Set NR_JOBS=1 takes 5 hours
 on an M1 MacBook Pro with 10-core M1 Max to generate a single AMD64 Intel image. Set to NR_JOBS=5 takes 3
 hours on an M1 Mac generating Intel images. Getting 10 jobs to run does fail on
-that same machine.
+that same machine. This is sensitive to memory allocated so with 32GB
+allocated, 10/2 = 5 processes works.
 
 ```sh
-# start at 14 jobs
+# start at 14 jobs if you have enough memory and only need Intel images
 make build NR_JOBS=14
 # decreases until you get a clean build
 # for example, build with half the processors on the machine
 make build NR_JOBS=$(($(nproc/2)))
+# if you wnat a multiarch image with arm64 and amd64 then
+make buildx
 ```
     
 ### Running the Docker Image

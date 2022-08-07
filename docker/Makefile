@@ -6,8 +6,11 @@
 # this is set to half the cores as a rough guess
 # set NR_JOBS to half the processors by default
 SHELL=/bin/bash
+# works with 32GB and 5 cores allocated to docker
 NR_JOBS ?= $$(($$(nproc)/2))
-TAG ?= v0.0.3-rich
+# works for 32GB and 5 cores
+NR_JOBS ?= $(shell nproc)
+TAG ?= v0.1.1
 
 # registry can be docker.io, ghcr.io, gcr.io for exmaple
 # REGISTRY ?= docker.io
@@ -16,11 +19,12 @@ ORG ?= netdrones
 IMAGE ?= covins-rich
 # set to the sha of the current commit
 TAG ?= $(shell git rev-parse HEAD)
-# multiplatform builds only work with buildx
-PLATFORM ?= linux/amd64,linux/arm64
+# multiple platforms can be built at once
+PLATFORM ?= linux/amd64 linux/arm64
+MULTI_PLATFORM ?= $(shell echo $(PLATFORM) | sed 's/ /,/g')
 # these can work with regular docker build to change the platform
-#PLATFORM ?= linux/amd64
-#PLATFORM ?= linux/arm64
+#MULTI_PLATFORM ?= linux/amd64
+#MULTI_PLATFORM ?= linux/arm64
 
 .DEFAULT_GOAL := help
 .PHONY: help
@@ -28,58 +32,72 @@ PLATFORM ?= linux/amd64,linux/arm64
 help: $(MAKEFILE_LIST)
 	@sed -n 's/^##//p' $(MAKEFILE_LIST)
 
-## build: build single image with amd64 architecture
-.PHONY: build
-build:
-	@echo "Use -j$(NR_JOBS) for build commands"
-	@docker build -t $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
-			--build-arg NR_JOBS=$(NR_JOBS) \
-			-f ./Dockerfile \
-			.. && \
-	docker tag $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
-		$(REGISTRY)/$(ORG)/$(IMAGE):latest && \
-	docker push --all-tags $(REGISTRY)/$(ORG)/$(IMAGE)
 
-## buildx: build multiple architecture in single image
-.PHONY: buildx
-buildx:
-	docker buildx build -t $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
+## build: build multiple architecture in single image with buildx
+.PHONY: build
+build: warning
+	@time ( \
+		docker buildx build -t $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
 			--push \
-			--platform $(PLATFORM) \
+			--platform $(MULTI_PLATFORM) \
 			--build-arg NR_JOBS=$(NR_JOBS) \
 			-f ./Dockerfile \
 			.. && \
-	docker tag $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
-		$(REGISTRY)/$(ORG)/$(IMAGE):latest && \
-	docker push --all-tags $(REGISTRY)/$(ORG)/$(IMAGE)
+		docker tag $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
+			$(REGISTRY)/$(ORG)/$(IMAGE):latest && \
+		docker push --all-tags $(REGISTRY)/$(ORG)/$(IMAGE) \
+	)	
+
+## single: build one architecture at time to lower memory used
+.PHONY: single
+single: warning
+	@time ( \
+		docker build -t $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
+			--build-arg NR_JOBS=$(NR_JOBS) \
+			-f ./Dockerfile \
+			.. && \
+		docker tag $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
+			$(REGISTRY)/$(ORG)/$(IMAGE):latest && \
+		docker push --all-tags $(REGISTRY)/$(ORG)/$(IMAGE) \
+	)
 
 ## debug: dump all docker buildx messages out
 # https://stackoverflow.com/questions/65819424/is-there-a-way-to-increase-the-log-size-in-docker-when-building-a-container
 .PHONY: debug
 debug:
-	if ! docker buildx ls | grep -q "^big"; then \
+	@time ( \
+		if ! docker buildx ls | grep -q "^big"; then \
 		docker buildx create --name big --driver-opt \
 			env.BUILDKIT_STEP_LOG_MAX_SIZE=100000000; \
-	fi && \
-	docker buildx use big && \
-	docker buildx build -t $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
-			--push \
-			--progress plain  \
-			--platform $(PLATFORM) \
-			--build-arg NR_JOBS=$(NR_JOBS) \
-			-f ./Dockerfile \
-			.. && \
-	docker tag $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
-		$(REGISTRY)/$(ORG)/$(IMAGE):latest && \
-	docker push --all-tags $(REGISTRY)/$(ORG)/$(IMAGE) && \
-	docker buildx use default
+		fi && \
+		docker buildx use big && \
+		docker buildx build -t $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
+				--push \
+				--progress plain  \
+				--platform $(MULTI_PLATFORM) \
+				--build-arg NR_JOBS=$(NR_JOBS) \
+				-f ./Dockerfile \
+				.. && \
+		docker tag $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
+			$(REGISTRY)/$(ORG)/$(IMAGE):latest && \
+		docker push --all-tags $(REGISTRY)/$(ORG)/$(IMAGE) && \
+		docker buildx use default \
+	)	
 
-## tag: tag current presentation
+## tag: tag image with TAG=semvar
 .PHONY: tag
 tag:
-	git tag -a $(TAG) -m "tagged with $(TAG)" && \
+	@git tag -a $(TAG) -m "tagged with $(TAG)" && \
 	git push --tags
 
+
+## warning: RAM and processor requirements
+.PHONY: warning
+warning:
+	@echo "32GB RAM and 5 cores in docker required for NR_JOBS=5"
+	@echo "7GB RAM and 2-core CPU in GitHub actions can only run single"
+
+## clean: remove docker images
 .PHONY: clean
 clean:
 	@docker rmi -f $(REGIStRY)/$(ORG)/$(IMAGE)

@@ -6,9 +6,9 @@
 # this is set to half the cores as a rough guess
 # set NR_JOBS to half the processors by default
 SHELL=/bin/bash
-# works with 32GB and 5 cores allocated to docker
-NR_JOBS ?= $$(($$(nproc)/2))
-# works for 32GB and 5 cores
+# works with 16GB and 5 cores allocated to docker
+# use make stats to see maximum buildx utilization
+#NR_JOBS ?= $$(($$(nproc)/2))
 NR_JOBS ?= $(shell nproc)
 TAG ?= v0.1.1
 
@@ -16,10 +16,10 @@ TAG ?= v0.1.1
 # REGISTRY ?= docker.io
 REGISTRY ?= ghcr.io
 ORG ?= netdrones
-IMAGE ?= covins-rich
+IMAGE ?= covins
 # set to the sha of the current commit
 TAG ?= $(shell git rev-parse HEAD)
-# multiple platforms can be built at once
+# Cannot run multiple arch if memory <= 7GB
 PLATFORM ?= linux/amd64 linux/arm64
 MULTI_PLATFORM ?= $(shell echo $(PLATFORM) | sed 's/ /,/g')
 # these can work with regular docker build to change the platform
@@ -34,9 +34,14 @@ help: $(MAKEFILE_LIST)
 
 
 ## build: build multiple architecture in single image with buildx
+# create a builder with large log file
 .PHONY: build
 build: warning
 	@time ( \
+		if ! docker buildx ls | grep -q build-$(IMAGE); then \
+			docker buildx create --name build-$(IMAGE) --use \
+				--driver-opt env.BUILDKIT_STEP_LOG_MAX_SIZE=100000000 \
+		; fi && \
 		docker buildx build -t $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
 			--push \
 			--platform $(MULTI_PLATFORM) \
@@ -45,7 +50,8 @@ build: warning
 			.. && \
 		docker tag $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
 			$(REGISTRY)/$(ORG)/$(IMAGE):latest && \
-		docker push --all-tags $(REGISTRY)/$(ORG)/$(IMAGE) \
+		docker push --all-tags $(REGISTRY)/$(ORG)/$(IMAGE) && \
+		docker buildx rm build-$(IMAGE) \
 	)	
 
 ## single: build one architecture at time to lower memory used
@@ -94,8 +100,14 @@ tag:
 ## warning: RAM and processor requirements
 .PHONY: warning
 warning:
-	@echo "32GB RAM and 5 cores in docker required for NR_JOBS=5"
-	@echo "7GB RAM and 2-core CPU in GitHub actions can only run single"
+	@echo "32GB RAM and 5 cores in docker required for NR_JOBS=10"
+	@echo "16GB RAM and 5 cores in docker required for NR_JOBS=5"
+	@echo "7GB RAM and 2-core CPU (eg GitHub Actions) NR_JOBS=1, single PLATFORM"
+
+## stats: memory and other stats of containers
+.PHONY: stats
+stats:
+	@docker stats
 
 ## clean: remove docker images
 .PHONY: clean

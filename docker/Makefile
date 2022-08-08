@@ -1,30 +1,29 @@
-
-# assume docker gets half the cpus on the bare metal and put 2 jobs per core
-# so NR_JOBS is the number of processors in the machine given by `nproc`
-#NR_JOBS ?= $(shell nproc)
-# the build can fail with too many jobs in CC compilation, so 
-# this is set to half the cores as a rough guess
-# set NR_JOBS to half the processors by default
+## Dockerized Make for Covins
 SHELL=/bin/bash
-# works with 16GB and 5 cores allocated to docker
-# use make stats to see maximum buildx utilization
-#NR_JOBS ?= $$(($$(nproc)/2))
-NR_JOBS ?= $(shell nproc)
-TAG ?= v0.1.1
+NR_JOBS != $(($(nproc)/2))
+# NR_JOBS ?= $(shell nproc)
+
+TAG ?= v1.0.1
 
 # registry can be docker.io, ghcr.io, gcr.io for exmaple
 # REGISTRY ?= docker.io
 REGISTRY ?= docker.io
 ORG ?= vis4rob
 IMAGE ?= covins
+# pushing is optional
+ifdef PUSH
+  FLAGS += --push
+endif
+
+# to push set PUSH ?= --push
 # set to the sha of the current commit
 TAG ?= $(shell git rev-parse HEAD)
 # Cannot run multiple arch if memory <= 7GB
-PLATFORM ?= linux/amd64 linux/arm64
-MULTI_PLATFORM ?= $(shell echo $(PLATFORM) | sed 's/ /,/g')
+#PLATFORM ?= linux/amd64,linux/arm64
+#PLATFORM ?= $(shell echo $(MULTI_PLATFORM) | sed 's/ /,/g')
 # these can work with regular docker build to change the platform
-#MULTI_PLATFORM ?= linux/amd64
-#MULTI_PLATFORM ?= linux/arm64
+PLATFORM ?= linux/amd64
+#PLATFORM ?= linux/arm64
 
 .DEFAULT_GOAL := help
 .PHONY: help
@@ -43,8 +42,8 @@ build: warning
 				--driver-opt env.BUILDKIT_STEP_LOG_MAX_SIZE=100000000 \
 		; fi && \
 		docker buildx build -t $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
-			--push \
-			--platform $(MULTI_PLATFORM) \
+			$(FLAGS) \
+			--platform $(PLATFORM) \
 			--build-arg NR_JOBS=$(NR_JOBS) \
 			-f ./Dockerfile \
 			.. && \
@@ -80,7 +79,7 @@ debug:
 		docker buildx build -t $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
 				--push \
 				--progress plain  \
-				--platform $(MULTI_PLATFORM) \
+				--platform $(PLATFORM) \
 				--build-arg NR_JOBS=$(NR_JOBS) \
 				-f ./Dockerfile \
 				.. && \
@@ -101,7 +100,8 @@ tag:
 .PHONY: warning
 warning:
 	@echo "32GB RAM and 5 cores in docker required for NR_JOBS=10"
-	@echo "16GB RAM and 5 cores in docker required for NR_JOBS=5"
+	@echo "24GB RAM and 5 cores in docker required for NR_JOBS=5"
+	@echo "16GB RAM and 5 cores in docker fails with NR_JOBS=10"
 	@echo "7GB RAM and 2-core CPU (eg GitHub Actions) NR_JOBS=1, single PLATFORM"
 
 ## stats: memory and other stats of containers

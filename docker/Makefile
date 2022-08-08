@@ -1,5 +1,5 @@
 ## Dockerized Make for Covins
-SHELL=/bin/bash
+SHELL := /usr/bin/env bash
 NR_JOBS != $(($(nproc)/2))
 # NR_JOBS ?= $(shell nproc)
 
@@ -14,6 +14,7 @@ IMAGE ?= covins
 ifdef PUSH
   FLAGS += --push
 endif
+MEMORY != docker info | grep "Total Memory" | sed 's/[^0-9\.]*//g'
 
 # to push set PUSH ?= --push
 # set to the sha of the current commit
@@ -97,12 +98,18 @@ tag:
 
 
 ## warning: RAM and processor requirements
+# note need to use bc because bash does not support floating comparison
+# https://stackoverflow.com/questions/33111191/bash-bc-curl-comparing-variables
+# Note that the values in a GiB so slightly more than a GB
 .PHONY: warning
 warning:
-	@echo "32GB RAM and 5 cores in docker required for NR_JOBS=10"
-	@echo "24GB RAM and 5 cores in docker required for NR_JOBS=5"
-	@echo "16GB RAM and 5 cores in docker fails with NR_JOBS=10"
-	@echo "7GB RAM and 2-core CPU (eg GitHub Actions) NR_JOBS=1, single PLATFORM"
+	@echo "$(MEMORY) RAM available need at least 7GB and 32GB for multiarch" && \
+	if [[ $(PLATFORM) =~ , ]] && (( $$(bc <<<"$(MEMORY) <= 31") )); then \
+		echo "WARNING: Multiple build require at least 32GB of RAM"; \
+	fi && \
+	if (( $$(bc <<<"$(MEMORY) <= 6.8") )); then \
+	    echo "WARNING: build requires more than 7GB of RAM"; \
+	fi
 
 ## stats: memory and other stats of containers
 .PHONY: stats

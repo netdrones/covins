@@ -55,7 +55,7 @@ buildx: warning
 
 ## push: push local images
 .PHONY: push
-push:
+push: build
 		docker push --all-tags $(REGISTRY)/$(ORG)/$(IMAGE)
 
 ## build: build one architecture at time to lower memory used

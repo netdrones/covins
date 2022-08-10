@@ -3,12 +3,26 @@
 In the original documentation, the advice is to set `make build NR_JOBS=14` and
 when that fails keep decreasing it.
 
-## Building and pushing into a registry
+## Building Quickstart
 
 You can now add a make parameter and the image registry, registry organization
-and image name by setting:
+and image name by setting. By default you build a single image to the local
+docker cache:
 
 ```sh
+# builds a single image
+make build
+```
+
+## Pushing
+
+If you want to push it you can either specify this at build time or you can do
+it explicitlyi
+
+
+```sh
+# push the local image that was previously
+make push
 # this pushs by default to docker.io/vis4rbo/covins:v1.0.1
 make build PUSH=1
 # pushes to ghcr.io/netdrones/covins-build:v1.0.1
@@ -22,10 +36,10 @@ PLATFORM environment variable, you can build for instance for both Intel and
 Apple Silicon:
 
 ```sh
-# build just for intel
+# build just you local machine architecture as noted in uname -m
 make build
-# build for intel and Apple silicon
-make build PLATFORM=linux/amd64,linux/arm64
+# build for intel and Apple silicon not you must have a push location
+make buildx PLATFORM=linux/amd64,linux/arm64
 ```
 
 ### Number of jobs per processor cores and jobs per make
@@ -73,7 +87,7 @@ Pro (2021) with an M1 Max 10-core and 64GB memory:
 - Build of dual fails with gcc error using 16GB and 10 jobs for 5 cores after 3 hours
 - Build of dual gcc error with 24GB and 5 jobs for 5 cores after 2 hours
 - Build of dual images succeeds with 32GB of RAM and 5 jobs/image for 5 cores
-  after 2 hours
+  after 2 hours of building
 - Build of dual succeeds with 32GB and 10 jobs for 5 cores after 2 hours
 
 ## Debugging memory issues with docker stats

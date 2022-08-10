@@ -4,11 +4,9 @@ NR_JOBS != $(($(nproc)/2))
 # NR_JOBS ?= $(shell nproc)
 
 # registry can be docker.io, ghcr.io, gcr.io for exmaple
-# REGISTRY ?= docker.io
-REGISTRY ?= ghcr.io
-ORG ?= netdrone
-IMAGE ?= test
-MEMORY != docker info | grep "Total Memory" | sed 's/[^0-9\.]*//g'
+REGISTRY ?= docker.io
+ORG ?= vis4rob
+IMAGE ?= covins
 DOCKERFILE ?= Dockerfile
 # we are building the parent
 BUILD_PATH ?= ..
@@ -24,11 +22,11 @@ OUTPUT ?= $(if $(PUSH),--push,--load)
 # for instance make build TAG=v1.0.1
 TAG ?= $(shell git rev-parse HEAD)
 # Cannot run multiple arch if memory <= 7GB
-#PLATFORM ?= linux/amd64,linux/arm64
-#PLATFORM ?= $(shell echo $(MULTI_PLATFORM) | sed 's/ /,/g')
-# these can work with regular docker build to change the platform
-PLATFORM ?= linux/amd64
+PLATFORM ?= linux/amd64,linux/arm64
+#PLATFORM ?= linux/amd64
 #PLATFORM ?= linux/arm64
+
+MEMORY != docker info | grep "Total Memory" | sed 's/[^0-9\.]*//g'
 
 .DEFAULT_GOAL := help
 .PHONY: help
@@ -55,7 +53,7 @@ buildx: warning
 
 ## push: push local images
 .PHONY: push
-push: build
+push: 
 		docker push --all-tags $(REGISTRY)/$(ORG)/$(IMAGE)
 
 ## build: build one architecture at time to lower memory used

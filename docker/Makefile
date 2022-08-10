@@ -10,13 +10,9 @@ TAG ?= v1.0.1
 REGISTRY ?= docker.io
 ORG ?= vis4rob
 IMAGE ?= covins
-# pushing is optional
-ifdef PUSH
-  FLAGS += --push
-endif
 MEMORY != docker info | grep "Total Memory" | sed 's/[^0-9\.]*//g'
+# note PUSH is used to push images
 
-# to push set PUSH ?= --push
 # set to the sha of the current commit
 TAG ?= $(shell git rev-parse HEAD)
 # Cannot run multiple arch if memory <= 7GB
@@ -35,6 +31,10 @@ help: $(MAKEFILE_LIST)
 
 ## build: build multiple architecture in single image with buildx
 # create a builder with large log file
+# latest is automatically applied so do not need to tag
+		#docker pull $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) && \
+		#docker tag $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
+		#    $(REGISTRY)/$(ORG)/$(IMAGE):latest && \
 .PHONY: build
 build: warning
 	@time ( \
@@ -43,13 +43,11 @@ build: warning
 				--driver-opt env.BUILDKIT_STEP_LOG_MAX_SIZE=100000000 \
 		; fi && \
 		docker buildx build -t $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
-			$(FLAGS) \
+			$(if $(PUSH),--push) \
 			--platform $(PLATFORM) \
 			--build-arg NR_JOBS=$(NR_JOBS) \
 			-f ./Dockerfile \
 			.. && \
-		docker tag $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
-			$(REGISTRY)/$(ORG)/$(IMAGE):latest && \
 		docker push --all-tags $(REGISTRY)/$(ORG)/$(IMAGE) && \
 		docker buildx rm build-$(IMAGE) \
 	)	
@@ -78,7 +76,7 @@ debug:
 		fi && \
 		docker buildx use big && \
 		docker buildx build -t $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
-				--push \
+				$(if $(PUSH),--push ) \
 				--progress plain  \
 				--platform $(PLATFORM) \
 				--build-arg NR_JOBS=$(NR_JOBS) \
@@ -103,7 +101,7 @@ tag:
 # Note that the values in a GiB so slightly more than a GB
 .PHONY: warning
 warning:
-	@echo "$(MEMORY) RAM available need at least 7GB and 32GB for multiarch" && \
+	@echo "$(MEMORY) RAM available need at least 7GB and 32GB for two architectures" && \
 	if [[ $(PLATFORM) =~ , ]] && (( $$(bc <<<"$(MEMORY) <= 31") )); then \
 		echo "WARNING: Multiple build require at least 32GB of RAM"; \
 	fi && \

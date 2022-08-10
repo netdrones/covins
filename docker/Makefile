@@ -3,17 +3,25 @@ SHELL := /usr/bin/env bash
 NR_JOBS != $(($(nproc)/2))
 # NR_JOBS ?= $(shell nproc)
 
-TAG ?= v1.0.1
-
 # registry can be docker.io, ghcr.io, gcr.io for exmaple
 # REGISTRY ?= docker.io
-REGISTRY ?= docker.io
-ORG ?= vis4rob
-IMAGE ?= covins
+REGISTRY ?= ghcr.io
+ORG ?= netdrone
+IMAGE ?= test
 MEMORY != docker info | grep "Total Memory" | sed 's/[^0-9\.]*//g'
-# note PUSH is used to push images
+DOCKERFILE ?= Dockerfile
+# we are building the parent
+BUILD_PATH ?= ..
+# use Dockerfile.dockerignore for files like README that should not break the
+# cache
+# https://github.com/docker/buildx/issues/166
+# the --load not compatible with multiarch images so do not
+# use with --platform=linux/arm64,linux/amd64 for example
+OUTPUT ?= $(if $(PUSH),--push,--load)
 
-# set to the sha of the current commit
+# default tag is just the sha of the current git commit
+# overwrite if you want with the specific tag in
+# for instance make build TAG=v1.0.1
 TAG ?= $(shell git rev-parse HEAD)
 # Cannot run multiple arch if memory <= 7GB
 #PLATFORM ?= linux/amd64,linux/arm64
@@ -29,71 +37,67 @@ help: $(MAKEFILE_LIST)
 	@sed -n 's/^##//p' $(MAKEFILE_LIST)
 
 
-## build: build multiple architecture in single image with buildx
+## buildx: Use BuildKit if you want multiarch images
 # create a builder with large log file
 # latest is automatically applied so do not need to tag
-		#docker pull $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) && \
-		#docker tag $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
-		#    $(REGISTRY)/$(ORG)/$(IMAGE):latest && \
+.PHONY: buildx
+buildx: warning
+	@time ( \
+		docker buildx build -t $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
+			--platform $(PLATFORM) \
+			--build-arg NR_JOBS=$(NR_JOBS) \
+			-f $(DOCKERFILE) \
+			$(OUTPUT) \
+			$(BUILD_PATH) && \
+		docker tag $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
+			$(REGISTRY)/$(ORG)/$(IMAGE):latest \
+		)
+
+## push: push local images
+.PHONY: push
+push:
+		docker push --all-tags $(REGISTRY)/$(ORG)/$(IMAGE)
+
+## build: build one architecture at time to lower memory used
 .PHONY: build
 build: warning
+	@time ( \
+		docker build -t $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
+			--build-arg NR_JOBS=$(NR_JOBS) \
+			-f $(DOCKERFILE) \
+			$(BUILD_PATH) && \
+		docker tag $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
+			$(REGISTRY)/$(ORG)/$(IMAGE):latest \
+	)
+
+## debug: dump all docker buildx messages out
+# create a temporary docker context with larger log size
+# https://stackoverflow.com/questions/65819424/is-there-a-way-to-increase-the-log-size-in-docker-when-building-a-container
+.PHONY: debug
+debug:
 	@time ( \
 		if ! docker buildx ls | grep -q build-$(IMAGE); then \
 			docker buildx create --name build-$(IMAGE) --use \
 				--driver-opt env.BUILDKIT_STEP_LOG_MAX_SIZE=100000000 \
 		; fi && \
-		docker buildx build -t $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
-			$(if $(PUSH),--push) \
-			--platform $(PLATFORM) \
-			--build-arg NR_JOBS=$(NR_JOBS) \
-			-f ./Dockerfile \
-			.. && \
-		docker push --all-tags $(REGISTRY)/$(ORG)/$(IMAGE) && \
-		docker buildx rm build-$(IMAGE) \
-	)	
-
-## single: build one architecture at time to lower memory used
-.PHONY: single
-single: warning
-	@time ( \
-		docker build -t $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
-			--build-arg NR_JOBS=$(NR_JOBS) \
-			-f ./Dockerfile \
-			.. && \
-		docker tag $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
-			$(REGISTRY)/$(ORG)/$(IMAGE):latest && \
-		docker push --all-tags $(REGISTRY)/$(ORG)/$(IMAGE) \
-	)
-
-## debug: dump all docker buildx messages out
-# https://stackoverflow.com/questions/65819424/is-there-a-way-to-increase-the-log-size-in-docker-when-building-a-container
-.PHONY: debug
-debug:
-	@time ( \
-		if ! docker buildx ls | grep -q "^big"; then \
-		docker buildx create --name big --driver-opt \
-			env.BUILDKIT_STEP_LOG_MAX_SIZE=100000000; \
-		fi && \
 		docker buildx use big && \
 		docker buildx build -t $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
-				$(if $(PUSH),--push ) \
+				$(OUTPUT) \
 				--progress plain  \
 				--platform $(PLATFORM) \
 				--build-arg NR_JOBS=$(NR_JOBS) \
-				-f ./Dockerfile \
-				.. && \
+				-f $(DOCKERFILE) \
+				$(BUILD_PATH) && \
 		docker tag $(REGISTRY)/$(ORG)/$(IMAGE):$(TAG) \
 			$(REGISTRY)/$(ORG)/$(IMAGE):latest && \
-		docker push --all-tags $(REGISTRY)/$(ORG)/$(IMAGE) && \
-		docker buildx use default \
+		docker buildx rm build-$(IMAGE) \
 	)	
 
-## tag: tag image with TAG=semvar
+## tag: Add a github tag you can use with make build TAG=_your tag_
 .PHONY: tag
 tag:
 	@git tag -a $(TAG) -m "tagged with $(TAG)" && \
 	git push --tags
-
 
 ## warning: RAM and processor requirements
 # note need to use bc because bash does not support floating comparison

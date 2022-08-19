@@ -1,6 +1,6 @@
 ## Dockerized Make for Covins
 SHELL := /usr/bin/env bash
-NR_JOBS != $(($(nproc)/2))
+NR_JOBS ?= $$(($$(nproc)/2))
 # NR_JOBS ?= $(shell nproc)
 
 # registry can be docker.io, ghcr.io, gcr.io for exmaple

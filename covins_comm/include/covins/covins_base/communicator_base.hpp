@@ -29,7 +29,7 @@
 #include <thread>
 #include <list>
 #include <netinet/in.h>
-#include <eigen3/Eigen/Core>
+#include <Eigen/Core>
 
 // COVINS
 #include "typedefs_base.hpp"

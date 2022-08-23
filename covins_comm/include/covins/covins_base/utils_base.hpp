@@ -24,15 +24,15 @@
 #pragma once
 
 // C++
-#include <eigen3/Eigen/Core>
-#include <eigen3/Eigen/Geometry>
+#include <Eigen/Core>
+#include <Eigen/Geometry>
 #include <opencv2/opencv.hpp>
 
 // COVINS
 #include <covins/covins_base/config_comm.hpp>
 
 // Thirdparty
-#include <glog/logging.h>
+//#include <glog/logging.h>
 
 namespace covins {
 

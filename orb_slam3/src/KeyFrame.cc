@@ -23,7 +23,7 @@
 #include<mutex>
 
 // COVINS
-#include <eigen3/Eigen/Core>
+#include <Eigen/Core>
 #include <covins/covins_base/utils_base.hpp>
 #include <covins/covins_base/typedefs_base.hpp>
 

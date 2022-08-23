@@ -35,7 +35,9 @@
 #include "LoopClosing.h"
 #include "KeyFrameDatabase.h"
 #include "ORBVocabulary.h"
+#if defined(WITH_VIEWER) && WITH_VIEWER
 #include "Viewer.h"
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 #include "ImuTypes.h"
 #include "Config.h"
 
@@ -212,11 +214,13 @@ private:
     covins::TypeDefs::ThreadPtr thread_comm_;
 #endif
 
+#if defined(WITH_VIEWER) && WITH_VIEWER
     // The viewer draws the map and the current camera pose. It uses Pangolin.
     Viewer* mpViewer;
 
     FrameDrawer* mpFrameDrawer;
     MapDrawer* mpMapDrawer;
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
     // System threads: Local Mapping, Loop Closing, Viewer.
     // The Tracking thread "lives" in the main execution thread that creates the System object.

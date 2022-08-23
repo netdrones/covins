@@ -57,7 +57,12 @@ class Tracking
 {  
 
 public:
-    Tracking(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Atlas* pAtlas,
+    Tracking(System* pSys, ORBVocabulary* pVoc,
+#if defined(WITH_VIEWER) && WITH_VIEWER
+             FrameDrawer* pFrameDrawer,
+             MapDrawer* pMapDrawer,
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
+             Atlas* pAtlas,
              KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor, const string &_nameSeq=std::string());
 
     ~Tracking();
@@ -270,12 +275,15 @@ protected:
     
     // System
     System* mpSystem;
-    
+
+
+#if defined(WITH_VIEWER) && WITH_VIEWER
     //Drawers
     Viewer* mpViewer;
     FrameDrawer* mpFrameDrawer;
     MapDrawer* mpMapDrawer;
     bool bStepByStep;
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
     //Atlas
     Atlas* mpAtlas;

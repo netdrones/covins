@@ -30,9 +30,9 @@
 #include <map>
 #include <set>
 
-#include <eigen3/Eigen/Core>
-#include <eigen3/Eigen/Geometry>
-#include <eigen3/Eigen/StdVector>
+#include <Eigen/Core>
+#include <Eigen/Geometry>
+#include <Eigen/StdVector>
 
 #define COVINS_MOD //this marks modified parts of ORB-SLAM3
 

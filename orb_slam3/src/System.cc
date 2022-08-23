@@ -21,9 +21,12 @@
 #include "System.h"
 #include "Converter.h"
 #include <thread>
+#if defined(WITH_VIEWER) && WITH_VIEWER
 #include <pangolin/pangolin.h>
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 #include <iomanip>
-#include <openssl/md5.h>
+//#include <openssl/md5.h>
+#include "md5.h"
 #include <boost/serialization/base_object.hpp>
 #include <boost/serialization/string.hpp>
 #include <boost/archive/text_iarchive.hpp>
@@ -43,7 +46,11 @@ Verbose::eLevel Verbose::th = Verbose::VERBOSITY_NORMAL;
 
 System::System(const string &strVocFile, const string &strSettingsFile, const eSensor sensor,
                const bool bUseViewer, const int initFr, const string &strSequence, const string &strLoadingFile):
-    mSensor(sensor), mpViewer(static_cast<Viewer*>(NULL)), mbReset(false), mbResetActiveMap(false),
+    mSensor(sensor),
+#if defined(WITH_VIEWER) && WITH_VIEWER
+    mpViewer(static_cast<Viewer*>(NULL)),
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
+    mbReset(false), mbResetActiveMap(false),
     mbActivateLocalizationMode(false), mbDeactivateLocalizationMode(false)
 {
     // Output welcome message
@@ -101,14 +108,21 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         mpAtlas->SetInertialSensor();
 
     //Create Drawers. These are used by the Viewer
+#if defined(WITH_VIEWER) && WITH_VIEWER
     mpFrameDrawer = new FrameDrawer(mpAtlas);
     mpMapDrawer = new MapDrawer(mpAtlas, strSettingsFile);
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
     //Initialize the Tracking thread
     //(it will live in the main thread of execution, the one that called this constructor)
     cout << "Seq. Name: " << strSequence << endl;
+#if defined(WITH_VIEWER) && WITH_VIEWER
     mpTracker = new Tracking(this, mpVocabulary, mpFrameDrawer, mpMapDrawer,
                              mpAtlas, mpKeyFrameDatabase, strSettingsFile, mSensor, strSequence);
+#else
+    mpTracker = new Tracking(this, mpVocabulary,
+                             mpAtlas, mpKeyFrameDatabase, strSettingsFile, mSensor, strSequence);
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
     //Initialize the Local Mapping thread and launch
     mpLocalMapper = new LocalMapping(this, mpAtlas, mSensor==MONOCULAR || mSensor==IMU_MONOCULAR, mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO, strSequence);
@@ -127,6 +141,9 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     mptLoopClosing = new thread(&ORB_SLAM3::LoopClosing::Run, mpLoopCloser);
 
     //Initialize the Viewer thread and launch
+
+
+#if defined(WITH_VIEWER) && WITH_VIEWER
     if(bUseViewer)
     {
         mpViewer = new Viewer(this, mpFrameDrawer,mpMapDrawer,mpTracker,strSettingsFile);
@@ -135,6 +152,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         mpLoopCloser->mpViewer = mpViewer;
         mpViewer->both = mpFrameDrawer->both;
     }
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
     //Set pointers between threads
     mpTracker->SetLocalMapper(mpLocalMapper);
@@ -419,12 +437,14 @@ void System::Shutdown()
     #else
     mpLoopCloser->RequestFinish();
     #endif
+#if defined(WITH_VIEWER) && WITH_VIEWER
     if(mpViewer)
     {
         mpViewer->RequestFinish();
         while(!mpViewer->isFinished())
             usleep(5000);
     }
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
     // Wait until all thread have effectively stopped
     #ifdef COVINS_MOD
@@ -477,15 +497,19 @@ void System::Shutdown()
     mptLoopClosing->join();
     std::cout << "--> Join Comm Thread" << std::endl;
     thread_comm_->join();
+#if defined(WITH_VIEWER) && WITH_VIEWER
     if(mpViewer) {
         std::cout << "--> Join Viewer Thread" << std::endl;
         mptViewer->join();
     }
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
     std::cout << "Done" << std::endl;
     #endif
 
+#if defined(WITH_VIEWER) && WITH_VIEWER
     if(mpViewer)
         pangolin::BindToContext("ORB-SLAM2: Map Viewer");
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
 #ifdef REGISTER_TIMES
     mpTracker->PrintTimeStats();

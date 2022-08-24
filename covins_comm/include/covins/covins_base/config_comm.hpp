@@ -9,24 +9,24 @@ namespace covins_params {
 bool LoadConfigFile(const std::string& config_file);
 
 namespace sys {
-    std::string server_ip;
-    std::string port;
+    static std::string server_ip;
+    static std::string port;
 }
 
 namespace comm {
-    bool send_updates;
-    bool data_to_client;
-    int start_sending_after_kf;
-    int kf_buffer_withold;
-    int max_sent_kfs_per_iteration;
-    int update_window_size;
-    precision_t to_agent_freq;
-    precision_t start_drift_estimation_after_kf;
+    static bool send_updates;
+    static bool data_to_client;
+    static int start_sending_after_kf;
+    static int kf_buffer_withold;
+    static int max_sent_kfs_per_iteration;
+    static int update_window_size;
+    static precision_t to_agent_freq;
+    static precision_t start_drift_estimation_after_kf;
 }
 
 namespace orb {
-    bool activate_visualization;
-    precision_t imu_stamp_max_diff;
+    static bool activate_visualization;
+    static precision_t imu_stamp_max_diff;
 }
 
 void ShowParamsComm();

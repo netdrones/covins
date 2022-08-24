@@ -22,8 +22,8 @@ set(EXTERNAL_LIBRARIES
 )
 
 set(COMM_SOURCE_FILES
-    src/covins_base/communicator_base.cpp
-    src/covins_base/config_comm.cpp
+        src/covins_base/communicator_base.cpp
+        src/covins_base/config_comm.cpp.orig
     src/covins_base/utils_base.cpp
 
     src/covins_base/msgs/msg_keyframe.cpp
@@ -32,7 +32,7 @@ set(COMM_SOURCE_FILES
 
 set(COMM_HEADER_FILES
     include/covins/covins_base/communicator_base.hpp
-    include/covins/covins_base/config_comm.hpp
+        include/covins/covins_base/config_comm.hpp.orig
     include/covins/covins_base/typedefs_base.hpp
     include/covins/covins_base/utils_base.hpp
 

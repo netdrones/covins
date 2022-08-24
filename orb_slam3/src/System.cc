@@ -44,8 +44,13 @@ namespace ORB_SLAM3
 
 Verbose::eLevel Verbose::th = Verbose::VERBOSITY_NORMAL;
 
-System::System(const string &strVocFile, const string &strSettingsFile, const eSensor sensor,
-               const bool bUseViewer, const int initFr, const string &strSequence, const string &strLoadingFile):
+System::System(const string &strVocFile,
+               const string &strSettingsFile,
+               eSensor sensor,
+               bool bUseViewer,
+               int initFr,
+               const string &strSequence,
+               const string &strLoadingFile):
     mSensor(sensor),
 #if defined(WITH_VIEWER) && WITH_VIEWER
     mpViewer(static_cast<Viewer*>(NULL)),

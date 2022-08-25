@@ -11,6 +11,7 @@ SRC_ABS := $(ROOT_ABS)/orb_slam3
 
 EIGEN3_INCLUDE_DIR := $(LOCAL_PATH)/../../include/eigen3
 COVINS_COMM_INCLUDE_DIR := $(LOCAL_PATH)/../covins_comm/include
+COVINS_COMM_SRC := $(SRC_REL)/../covins_comm
 
 LOCAL_C_INCLUDES := \
 	$(SRC_ABS) \
@@ -20,8 +21,10 @@ LOCAL_C_INCLUDES := \
 	$(EIGEN3_INCLUDE_DIR) \
 	$(COVINS_COMM_INCLUDE_DIR) \
 	$(SRC_ABS)/include/comm \
-	$(SRC_ABS)/ThirdParty
+	$(SRC_ABS)/ThirdParty \
+	$(SRC_ABS)/../covins_comm/include/covins
 
+# ORB_SLAM3
 LOCAL_SRC_FILES := \
 	$(SRC_REL)/src/System.cc \
 	$(SRC_REL)/src/Tracking.cc \
@@ -47,15 +50,10 @@ LOCAL_SRC_FILES := \
 	$(SRC_REL)/src/OptimizableTypes.cpp \
 	$(SRC_REL)/src/MLPnPsolver.cpp \
 	$(SRC_REL)/src/TwoViewReconstruction.cc \
-	$(SRC_REL)/src/comm/communicator.cpp \
 
-# covins_comm
-COVINS_COMM_SRC := $(SRC_REL)/../covins_comm
-
-LOCAL_C_INCLUDES += \
-	$(SRC_ABS)/../covins_comm/include/covins
-
+# COVINS
 LOCAL_SRC_FILES += \
+	$(SRC_REL)/src/comm/communicator.cpp \
 	$(COVINS_COMM_SRC)/src/covins_base/communicator_base.cpp \
 	$(COVINS_COMM_SRC)/src/covins_base/config_comm.cpp \
 	$(COVINS_COMM_SRC)/src/covins_base/utils_base.cpp \
@@ -93,7 +91,6 @@ LOCAL_CFLAGS := \
     -Wno-unused-function \
     -Wno-unused-but-set-variable \
     -Wno-missing-prototypes \
-	-DANDROID \
 
 LOCAL_EXPORT_C_INCLUDES := \
 	$(SRC_ABS) \

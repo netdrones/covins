@@ -23,6 +23,8 @@
 
 #pragma once
 
+#ifdef COVINS_MOD
+
 // COVINS
 #include <covins/covins_base/communicator_base.hpp>
 
@@ -75,3 +77,5 @@ protected:
 };
 
 } //end ns
+
+#endif // COVINS_MOD

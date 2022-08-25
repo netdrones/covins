@@ -34,7 +34,7 @@
 #include <Eigen/Geometry>
 #include <Eigen/StdVector>
 
-#define COVINS_MOD //this marks modified parts of ORB-SLAM3
+//#define COVINS_MOD //this marks modified parts of ORB-SLAM3
 
 //SERIALIZATION
 #include <cereal/cereal.hpp>

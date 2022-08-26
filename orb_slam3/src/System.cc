@@ -134,14 +134,12 @@ System::System(const string &strVocFile,
     mpLocalMapper = new LocalMapping(this, mpAtlas, mSensor==MONOCULAR || mSensor==IMU_MONOCULAR, mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO, strSequence);
     mptLocalMapping = new thread(&ORB_SLAM3::LocalMapping::Run,mpLocalMapper);
     mpLocalMapper->mThFarPoints = fsSettings["thFarPoints"];
-    if(mpLocalMapper->mThFarPoints!=0)
-    {
-//        cout << "Discard points further than " << mpLocalMapper->mThFarPoints << " m from current camera" << endl;
-        LOGD("Discard points further than %d m from current camera", mpLocalMapper->mThFarPoints);
+    if (mpLocalMapper->mThFarPoints!=0) {
+        LOGD("Discard points further than %f m from current camera", mpLocalMapper->mThFarPoints);
         mpLocalMapper->mbFarPoints = true;
-    }
-    else
+    } else {
         mpLocalMapper->mbFarPoints = false;
+    }
 
     //Initialize the Loop Closing thread and launch
     mpLoopCloser = new LoopClosing(mpAtlas, mpKeyFrameDatabase, mpVocabulary, mSensor!=MONOCULAR); // mSensor!=MONOCULAR);

@@ -40,6 +40,7 @@
 #endif // defined(WITH_VIEWER) && WITH_VIEWER
 #include "ImuTypes.h"
 #include "Config.h"
+#include "Logger.h"
 
 // COVINS
 #include "comm/communicator.hpp"
@@ -62,10 +63,30 @@ public:
     static eLevel th;
 
 public:
-    static void PrintMess(std::string str, eLevel lev)
+    static void PrintMess(const std::string& str, eLevel lev)
     {
-        if(lev <= th)
+        if(lev <= th) {
+#ifdef __ANDROID__
+            switch (lev) {
+                case VERBOSITY_NORMAL:
+                    LOGI("%s", str.c_str());
+                    break;
+                case VERBOSITY_VERBOSE:
+                    LOGV("%s", str.c_str());
+                    break;
+                case VERBOSITY_VERY_VERBOSE:
+                    LOGV("%s", str.c_str());
+                    break;
+                case VERBOSITY_DEBUG:
+                    LOGD("%s", str.c_str());
+                    break;
+                default:
+                    break;
+            }
+#else
             cout << str << endl;
+#endif // __ANDROID__
+        }
     }
 
     static void SetTh(eLevel _th)

@@ -28,6 +28,7 @@
 #include "Initializer.h"
 #include "G2oTypes.h"
 #include "Optimizer.h"
+#include "Logger.h"
 
 #include <iostream>
 
@@ -67,14 +68,14 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc,
     bool b_parse_cam = ParseCamParamFile(fSettings);
     if(!b_parse_cam)
     {
-        std::cout << "*Error with the camera parameters in the config file*" << std::endl;
+        LOGE("Error with the camera parameters in the config file");
     }
 
     // Load ORB parameters
     bool b_parse_orb = ParseORBParamFile(fSettings);
     if(!b_parse_orb)
     {
-        std::cout << "*Error with the ORB parameters in the config file*" << std::endl;
+        LOGE("Error with the ORB parameters in the config file");
     }
 
     initID = 0; lastID = 0;
@@ -86,7 +87,7 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc,
         b_parse_imu = ParseIMUParamFile(fSettings);
         if(!b_parse_imu)
         {
-            std::cout << "*Error with the IMU parameters in the config file*" << std::endl;
+            LOGE("Error with the IMU parameters in the config file");
         }
 
         mnFramesToResetIMU = mMaxFrames;
@@ -98,15 +99,7 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc,
 
     if(!b_parse_cam || !b_parse_orb || !b_parse_imu)
     {
-        std::cerr << "**ERROR in the config file, the format is not correct**" << std::endl;
-        try
-        {
-            throw -1;
-        }
-        catch(exception &e)
-        {
-
-        }
+        LOGE("ERROR in the config file, the format is not correct");
     }
 
 #ifdef REGISTER_TIMES
@@ -507,7 +500,7 @@ Tracking::~Tracking()
 bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
 {
     mDistCoef = cv::Mat::zeros(4,1,CV_32F);
-    cout << endl << "Camera Parameters: " << endl;
+    LOGD("Camera Parameters: ");
     bool b_miss_params = false;
 
     string sCameraName = fSettings["Camera.type"];
@@ -523,7 +516,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.fx parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.fx parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -534,7 +527,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.fy parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.fy parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -545,7 +538,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.cx parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.cx parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -556,7 +549,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.cy parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.cy parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -568,7 +561,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.k1 parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.k1 parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -579,7 +572,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.k2 parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.k2 parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -590,7 +583,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.p1 parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.p1 parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -601,7 +594,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.p2 parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.p2 parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -623,7 +616,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
 
         mpAtlas->AddCamera(mpCamera);
 
-
+#ifdef __ANDROID__
         std::cout << "- Camera: Pinhole" << std::endl;
         std::cout << "- fx: " << fx << std::endl;
         std::cout << "- fy: " << fy << std::endl;
@@ -638,6 +631,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
 
         if(mDistCoef.rows==5)
             std::cout << "- k3: " << mDistCoef.at<float>(4) << std::endl;
+#endif // __ANDROID__
 
         mK = cv::Mat::eye(3,3,CV_32F);
         mK.at<float>(0,0) = fx;
@@ -659,7 +653,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.fx parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.fx parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
         node = fSettings["Camera.fy"];
@@ -669,7 +663,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.fy parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.fy parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -680,7 +674,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.cx parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.cx parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -691,7 +685,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.cy parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.cy parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -703,7 +697,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.k1 parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.k1 parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
         node = fSettings["Camera.k2"];
@@ -713,7 +707,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.k2 parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.k2 parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -724,7 +718,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.k3 parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.k3 parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -735,7 +729,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.k4 parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.k4 parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -744,6 +738,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             vector<float> vCamCalib{fx,fy,cx,cy,k1,k2,k3,k4};
             mpCamera = new KannalaBrandt8(vCamCalib);
 
+#ifndef __ANDROID__
             std::cout << "- Camera: Fisheye" << std::endl;
             std::cout << "- fx: " << fx << std::endl;
             std::cout << "- fy: " << fy << std::endl;
@@ -753,6 +748,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             std::cout << "- k2: " << k2 << std::endl;
             std::cout << "- k3: " << k3 << std::endl;
             std::cout << "- k4: " << k4 << std::endl;
+#endif // __ANDROID__
 
             mK = cv::Mat::eye(3,3,CV_32F);
             mK.at<float>(0,0) = fx;
@@ -771,7 +767,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cerr << "*Camera2.fx parameter doesn't exist or is not a real number*" << std::endl;
+                LOGE("Camera2.fx parameter doesn't exist or is not a real number");
                 b_miss_params = true;
             }
             node = fSettings["Camera2.fy"];
@@ -781,7 +777,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cerr << "*Camera2.fy parameter doesn't exist or is not a real number*" << std::endl;
+                LOGE("Camera2.fy parameter doesn't exist or is not a real number");
                 b_miss_params = true;
             }
 
@@ -792,7 +788,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cerr << "*Camera2.cx parameter doesn't exist or is not a real number*" << std::endl;
+                LOGE("Camera2.cx parameter doesn't exist or is not a real number");
                 b_miss_params = true;
             }
 
@@ -803,7 +799,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cerr << "*Camera2.cy parameter doesn't exist or is not a real number*" << std::endl;
+                LOGE("Camera2.cy parameter doesn't exist or is not a real number");
                 b_miss_params = true;
             }
 
@@ -815,7 +811,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cerr << "*Camera2.k1 parameter doesn't exist or is not a real number*" << std::endl;
+                LOGE("Camera2.k1 parameter doesn't exist or is not a real number");
                 b_miss_params = true;
             }
             node = fSettings["Camera2.k2"];
@@ -825,7 +821,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cerr << "*Camera2.k2 parameter doesn't exist or is not a real number*" << std::endl;
+                LOGE("Camera2.k2 parameter doesn't exist or is not a real number");
                 b_miss_params = true;
             }
 
@@ -836,7 +832,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cerr << "*Camera2.k3 parameter doesn't exist or is not a real number*" << std::endl;
+                LOGE("Camera2.k3 parameter doesn't exist or is not a real number");
                 b_miss_params = true;
             }
 
@@ -847,7 +843,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cerr << "*Camera2.k4 parameter doesn't exist or is not a real number*" << std::endl;
+                LOGE("Camera2.k4 parameter doesn't exist or is not a real number");
                 b_miss_params = true;
             }
 
@@ -865,7 +861,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cout << "WARNING: Camera.lappingBegin not correctly defined" << std::endl;
+                LOGW("WARNING: Camera.lappingBegin not correctly defined");
             }
             node = fSettings["Camera.lappingEnd"];
             if(!node.empty() && node.isInt())
@@ -874,7 +870,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cout << "WARNING: Camera.lappingEnd not correctly defined" << std::endl;
+                LOGW("WARNING: Camera.lappingEnd not correctly defined");
             }
             node = fSettings["Camera2.lappingBegin"];
             if(!node.empty() && node.isInt())
@@ -883,7 +879,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cout << "WARNING: Camera2.lappingBegin not correctly defined" << std::endl;
+                LOGW("WARNING: Camera2.lappingBegin not correctly defined");
             }
             node = fSettings["Camera2.lappingEnd"];
             if(!node.empty() && node.isInt())
@@ -892,7 +888,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cout << "WARNING: Camera2.lappingEnd not correctly defined" << std::endl;
+                LOGW("WARNING: Camera2.lappingEnd not correctly defined");
             }
 
             node = fSettings["Tlr"];
@@ -901,20 +897,20 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
                 mTlr = node.mat();
                 if(mTlr.rows != 3 || mTlr.cols != 4)
                 {
-                    std::cerr << "*Tlr matrix have to be a 3x4 transformation matrix*" << std::endl;
+                    LOGE("Tlr matrix have to be a 3x4 transformation matrix");
                     b_miss_params = true;
                 }
             }
             else
             {
-                std::cerr << "*Tlr matrix doesn't exist*" << std::endl;
+                LOGE("Tlr matrix doesn't exist");
                 b_miss_params = true;
             }
 
             if(!b_miss_params)
             {
-                static_cast<KannalaBrandt8*>(mpCamera)->mvLappingArea[0] = leftLappingBegin;
-                static_cast<KannalaBrandt8*>(mpCamera)->mvLappingArea[1] = leftLappingEnd;
+                dynamic_cast<KannalaBrandt8*>(mpCamera)->mvLappingArea[0] = leftLappingBegin;
+                dynamic_cast<KannalaBrandt8*>(mpCamera)->mvLappingArea[1] = leftLappingEnd;
 
 #if defined(WITH_VIEWER) && WITH_VIEWER
                 mpFrameDrawer->both = true;
@@ -923,9 +919,10 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
                 vector<float> vCamCalib2{fx,fy,cx,cy,k1,k2,k3,k4};
                 mpCamera2 = new KannalaBrandt8(vCamCalib2);
 
-                static_cast<KannalaBrandt8*>(mpCamera2)->mvLappingArea[0] = rightLappingBegin;
-                static_cast<KannalaBrandt8*>(mpCamera2)->mvLappingArea[1] = rightLappingEnd;
+                dynamic_cast<KannalaBrandt8*>(mpCamera2)->mvLappingArea[0] = rightLappingBegin;
+                dynamic_cast<KannalaBrandt8*>(mpCamera2)->mvLappingArea[1] = rightLappingEnd;
 
+#ifndef __ANDROID__
                 std::cout << "- Camera1 Lapping: " << leftLappingBegin << ", " << leftLappingEnd << std::endl;
 
                 std::cout << std::endl << "Camera2 Parameters:" << std::endl;
@@ -942,6 +939,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
                 std::cout << "- mTlr: \n" << mTlr << std::endl;
 
                 std::cout << "- Camera2 Lapping: " << rightLappingBegin << ", " << rightLappingEnd << std::endl;
+#endif // __ANDROID__
             }
         }
 
@@ -955,8 +953,8 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
     }
     else
     {
-        std::cerr << "*Not Supported Camera Sensor*" << std::endl;
-        std::cerr << "Check an example configuration file with the desired sensor" << std::endl;
+        LOGE("Not Supported Camera Sensor");
+        LOGE("Check an example configuration file with the desired sensor");
     }
 
     if(mSensor==System::STEREO || mSensor==System::IMU_STEREO)
@@ -1025,7 +1023,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*DepthMapFactor parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("DepthMapFactor parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -1052,7 +1050,7 @@ bool Tracking::ParseORBParamFile(cv::FileStorage &fSettings)
     }
     else
     {
-        std::cerr << "*ORBextractor.nFeatures parameter doesn't exist or is not an integer*" << std::endl;
+        LOGE("ORBextractor.nFeatures parameter doesn't exist or is not an integer");
         b_miss_params = true;
     }
 
@@ -1063,7 +1061,7 @@ bool Tracking::ParseORBParamFile(cv::FileStorage &fSettings)
     }
     else
     {
-        std::cerr << "*ORBextractor.scaleFactor parameter doesn't exist or is not a real number*" << std::endl;
+        LOGE("ORBextractor.scaleFactor parameter doesn't exist or is not a real number");
         b_miss_params = true;
     }
 
@@ -1074,7 +1072,7 @@ bool Tracking::ParseORBParamFile(cv::FileStorage &fSettings)
     }
     else
     {
-        std::cerr << "*ORBextractor.nLevels parameter doesn't exist or is not an integer*" << std::endl;
+        LOGE("ORBextractor.nLevels parameter doesn't exist or is not an integer");
         b_miss_params = true;
     }
 
@@ -1085,7 +1083,7 @@ bool Tracking::ParseORBParamFile(cv::FileStorage &fSettings)
     }
     else
     {
-        std::cerr << "*ORBextractor.iniThFAST parameter doesn't exist or is not an integer*" << std::endl;
+        LOGE("ORBextractor.iniThFAST parameter doesn't exist or is not an integer");
         b_miss_params = true;
     }
 
@@ -1096,7 +1094,7 @@ bool Tracking::ParseORBParamFile(cv::FileStorage &fSettings)
     }
     else
     {
-        std::cerr << "*ORBextractor.minThFAST parameter doesn't exist or is not an integer*" << std::endl;
+        LOGE("ORBextractor.minThFAST parameter doesn't exist or is not an integer");
         b_miss_params = true;
     }
 
@@ -1113,12 +1111,14 @@ bool Tracking::ParseORBParamFile(cv::FileStorage &fSettings)
     if(mSensor==System::MONOCULAR || mSensor==System::IMU_MONOCULAR)
         mpIniORBextractor = new ORBextractor(5*nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
 
+#ifndef __ANDROID__
     cout << endl << "ORB Extractor Parameters: " << endl;
     cout << "- Number of Features: " << nFeatures << endl;
     cout << "- Scale Levels: " << nLevels << endl;
     cout << "- Scale Factor: " << fScaleFactor << endl;
     cout << "- Initial Fast Threshold: " << fIniThFAST << endl;
     cout << "- Minimum Fast Threshold: " << fMinThFAST << endl;
+#endif // __ANDROID__
 
     return true;
 }
@@ -1134,19 +1134,20 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings)
         Tbc = node.mat();
         if(Tbc.rows != 4 || Tbc.cols != 4)
         {
-            std::cerr << "*Tbc matrix have to be a 4x4 transformation matrix*" << std::endl;
+            LOGE("Tbc matrix have to be a 4x4 transformation matrix");
             b_miss_params = true;
         }
     }
     else
     {
-        std::cerr << "*Tbc matrix doesn't exist*" << std::endl;
+        LOGE("Tbc matrix doesn't exist");
         b_miss_params = true;
     }
 
+#ifndef __ANDROID__
     cout << endl;
-
     cout << "Left camera to Imu Transform (Tbc): " << endl << Tbc << endl;
+#endif // __ANDROID__
 
     float freq, Ng, Na, Ngw, Naw;
 
@@ -1157,7 +1158,7 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings)
     }
     else
     {
-        std::cerr << "*IMU.Frequency parameter doesn't exist or is not an integer*" << std::endl;
+        LOGE("IMU.Frequency parameter doesn't exist or is not an integer");
         b_miss_params = true;
     }
 
@@ -1168,7 +1169,7 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings)
     }
     else
     {
-        std::cerr << "*IMU.NoiseGyro parameter doesn't exist or is not a real number*" << std::endl;
+        LOGE("IMU.NoiseGyro parameter doesn't exist or is not a real number");
         b_miss_params = true;
     }
 
@@ -1179,7 +1180,7 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings)
     }
     else
     {
-        std::cerr << "*IMU.NoiseAcc parameter doesn't exist or is not a real number*" << std::endl;
+        LOGE("IMU.NoiseAcc parameter doesn't exist or is not a real number");
         b_miss_params = true;
     }
 
@@ -1190,7 +1191,7 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings)
     }
     else
     {
-        std::cerr << "*IMU.GyroWalk parameter doesn't exist or is not a real number*" << std::endl;
+        LOGE("IMU.GyroWalk parameter doesn't exist or is not a real number");
         b_miss_params = true;
     }
 
@@ -1201,7 +1202,7 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings)
     }
     else
     {
-        std::cerr << "*IMU.AccWalk parameter doesn't exist or is not a real number*" << std::endl;
+        LOGE("IMU.AccWalk parameter doesn't exist or is not a real number");
         b_miss_params = true;
     }
 
@@ -1211,13 +1212,14 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings)
     }
 
     const float sf = sqrt(freq);
+#ifndef __ANDROID__
     cout << endl;
     cout << "IMU frequency: " << freq << " Hz" << endl;
     cout << "IMU gyro noise: " << Ng << " rad/s/sqrt(Hz)" << endl;
     cout << "IMU gyro walk: " << Ngw << " rad/s^2/sqrt(Hz)" << endl;
     cout << "IMU accelerometer noise: " << Na << " m/s^2/sqrt(Hz)" << endl;
     cout << "IMU accelerometer walk: " << Naw << " m/s^3/sqrt(Hz)" << endl;
-
+#endif // __ANDROID__
     mpImuCalib = new IMU::Calib(Tbc,Ng*sf,Na*sf,Ngw/sf,Naw/sf);
 
     mpImuPreintegratedFromLastKF = new IMU::Preintegrated(IMU::Bias(),*mpImuCalib);

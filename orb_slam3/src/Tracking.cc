@@ -492,11 +492,6 @@ void Tracking::PrintTimeStats()
 
 #endif
 
-Tracking::~Tracking()
-{
-
-}
-
 bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
 {
     mDistCoef = cv::Mat::zeros(4,1,CV_32F);
@@ -512,7 +507,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         cv::FileNode node = fSettings["Camera.fx"];
         if(!node.empty() && node.isReal())
         {
-            fx = node.real();
+            fx = static_cast<float>(node.real());
         }
         else
         {
@@ -523,7 +518,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         node = fSettings["Camera.fy"];
         if(!node.empty() && node.isReal())
         {
-            fy = node.real();
+            fy = static_cast<float>(node.real());
         }
         else
         {
@@ -534,7 +529,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         node = fSettings["Camera.cx"];
         if(!node.empty() && node.isReal())
         {
-            cx = node.real();
+            cx = static_cast<float>(node.real());
         }
         else
         {
@@ -545,7 +540,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         node = fSettings["Camera.cy"];
         if(!node.empty() && node.isReal())
         {
-            cy = node.real();
+            cy = static_cast<float>(node.real());
         }
         else
         {
@@ -649,7 +644,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         cv::FileNode node = fSettings["Camera.fx"];
         if(!node.empty() && node.isReal())
         {
-            fx = node.real();
+            fx = static_cast<float>(node.real());
         }
         else
         {
@@ -659,7 +654,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         node = fSettings["Camera.fy"];
         if(!node.empty() && node.isReal())
         {
-            fy = node.real();
+            fy = static_cast<float>(node.real());
         }
         else
         {
@@ -670,7 +665,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         node = fSettings["Camera.cx"];
         if(!node.empty() && node.isReal())
         {
-            cx = node.real();
+            cx = static_cast<float>(node.real());
         }
         else
         {
@@ -962,11 +957,11 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         cv::FileNode node = fSettings["Camera.bf"];
         if(!node.empty() && node.isReal())
         {
-            mbf = node.real();
+            mbf = static_cast<float>(node.real());
         }
         else
         {
-            std::cerr << "*Camera.bf parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.bf parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -999,11 +994,11 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         {
             mThDepth = node.real();
             mThDepth = mbf*mThDepth/fx;
-            cout << endl << "Depth Threshold (Close/Far Points): " << mThDepth << endl;
+            LOGD("Depth Threshold (Close/Far Points): %f", mThDepth);
         }
         else
         {
-            std::cerr << "*ThDepth parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("ThDepth parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -1015,7 +1010,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         cv::FileNode node = fSettings["DepthMapFactor"];
         if(!node.empty() && node.isReal())
         {
-            mDepthMapFactor = node.real();
+            mDepthMapFactor = static_cast<float>(node.real());
             if(fabs(mDepthMapFactor)<1e-5)
                 mDepthMapFactor=1;
             else
@@ -1165,7 +1160,7 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings)
     node = fSettings["IMU.NoiseGyro"];
     if(!node.empty() && node.isReal())
     {
-        Ng = node.real();
+        Ng = static_cast<float>(node.real());
     }
     else
     {
@@ -1176,7 +1171,7 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings)
     node = fSettings["IMU.NoiseAcc"];
     if(!node.empty() && node.isReal())
     {
-        Na = node.real();
+        Na = static_cast<float>(node.real());
     }
     else
     {
@@ -1187,7 +1182,7 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings)
     node = fSettings["IMU.GyroWalk"];
     if(!node.empty() && node.isReal())
     {
-        Ngw = node.real();
+        Ngw = static_cast<float>(node.real());
     }
     else
     {
@@ -1198,7 +1193,7 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings)
     node = fSettings["IMU.AccWalk"];
     if(!node.empty() && node.isReal())
     {
-        Naw = node.real();
+        Naw = static_cast<float>(node.real());
     }
     else
     {

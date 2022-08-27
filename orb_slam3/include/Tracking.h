@@ -65,7 +65,7 @@ public:
              Atlas* pAtlas,
              KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor, const string &_nameSeq=std::string());
 
-    ~Tracking();
+    ~Tracking() = default;
 
     // Parse the config file
     bool ParseCamParamFile(cv::FileStorage &fSettings);

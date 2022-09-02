@@ -37,6 +37,7 @@
 #include "MapDrawer.h"
 #include "System.h"
 #include "ImuTypes.h"
+#include "Settings.h"
 
 #include "GeometricCamera.h"
 
@@ -63,7 +64,9 @@ public:
              MapDrawer* pMapDrawer,
 #endif // defined(WITH_VIEWER) && WITH_VIEWER
              Atlas* pAtlas,
-             KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor, const string &_nameSeq=std::string());
+             KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor,
+             Settings* settings,
+             const string &_nameSeq=std::string());
 
     ~Tracking() = default;
 
@@ -290,8 +293,14 @@ protected:
 
     //Calibration matrix
     cv::Mat mK;
+    Eigen::Matrix3f mK_;
     cv::Mat mDistCoef;
     float mbf;
+    float mImageScale;
+
+    float mImuFreq;
+    double mImuPer;
+    bool mInsertKFsLost;
 
     //New KeyFrame rules (according to fps)
     int mMinFrames;
@@ -351,6 +360,8 @@ protected:
     int initID, lastID;
 
     cv::Mat mTlr;
+
+    void newParameterLoader(Settings* settings);
 
 public:
     cv::Mat mImRight;

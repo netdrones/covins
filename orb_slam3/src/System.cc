@@ -88,6 +88,32 @@ System::System(const string &strVocFile,
         exit(-1);
     }
 
+    cv::FileNode node = fsSettings["File.version"];
+    if(!node.empty() && node.isString() && node.string() == "1.0"){
+        settings_ = new Settings(strSettingsFile,mSensor);
+
+//        mStrLoadAtlasFromFile = settings_->atlasLoadFile();
+//        mStrSaveAtlasToFile = settings_->atlasSaveFile();
+
+//        cout << (*settings_) << endl;
+    }
+#if 0
+    else{
+        settings_ = nullptr;
+        cv::FileNode node = fsSettings["System.LoadAtlasFromFile"];
+        if(!node.empty() && node.isString())
+        {
+            mStrLoadAtlasFromFile = (string)node;
+        }
+
+        node = fsSettings["System.SaveAtlasToFile"];
+        if(!node.empty() && node.isString())
+        {
+            mStrSaveAtlasToFile = (string)node;
+        }
+    }
+#endif // if 0
+
 //    bool loadedAtlas = false;
 
     //----
@@ -124,10 +150,10 @@ System::System(const string &strVocFile,
     LOGD("Seq. Name: %s", strSequence.c_str());
 #if defined(WITH_VIEWER) && WITH_VIEWER
     mpTracker = new Tracking(this, mpVocabulary, mpFrameDrawer, mpMapDrawer,
-                             mpAtlas, mpKeyFrameDatabase, strSettingsFile, mSensor, strSequence);
+                             mpAtlas, mpKeyFrameDatabase, strSettingsFile, mSensor, settings_, strSequence);
 #else
     mpTracker = new Tracking(this, mpVocabulary,
-                             mpAtlas, mpKeyFrameDatabase, strSettingsFile, mSensor, strSequence);
+                             mpAtlas, mpKeyFrameDatabase, strSettingsFile, mSensor, settings_, strSequence);
 #endif // defined(WITH_VIEWER) && WITH_VIEWER
 
     //Initialize the Local Mapping thread and launch

@@ -40,6 +40,7 @@
 #endif // defined(WITH_VIEWER) && WITH_VIEWER
 #include "ImuTypes.h"
 #include "Config.h"
+#include "Settings.h"
 #include "Logger.h"
 
 // COVINS
@@ -111,7 +112,8 @@ public:
         STEREO=1,
         RGBD=2,
         IMU_MONOCULAR=3,
-        IMU_STEREO=4
+        IMU_STEREO=4,
+        IMU_RGBD=5,
     };
 
     // File type
@@ -270,6 +272,8 @@ private:
     std::vector<MapPoint*> mTrackedMapPoints;
     std::vector<cv::KeyPoint> mTrackedKeyPointsUn;
     std::mutex mMutexState;
+
+    Settings* settings_;
 };
 
 }// namespace ORB_SLAM

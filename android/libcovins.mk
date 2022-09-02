@@ -50,6 +50,7 @@ LOCAL_SRC_FILES := \
 	$(SRC_REL)/src/OptimizableTypes.cpp \
 	$(SRC_REL)/src/MLPnPsolver.cpp \
 	$(SRC_REL)/src/TwoViewReconstruction.cc \
+	$(SRC_REL)/src/Settings.cc \
 
 # COVINS
 LOCAL_SRC_FILES += \

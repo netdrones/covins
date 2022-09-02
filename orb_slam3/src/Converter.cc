@@ -95,6 +95,24 @@ cv::Mat Converter::toCvMat(const Eigen::Matrix<double,3,1> &m)
 
     return cvMat.clone();
 }
+cv::Mat Converter::toCvMat(const Sophus::SE3f& m) {
+    cv::Mat cvMat(4, 4, CV_32F);
+    auto q = m.so3().matrix();
+    auto t = m.translation().cast<float>();
+    for(int i=0;i<3;i++)
+    {
+        for(int j=0;j<3;j++)
+        {
+            cvMat.at<float>(i,j) = q(i, j);
+        }
+    }
+    for(int i=0;i<3;i++)
+    {
+        cvMat.at<float>(i,3) = t(i);
+    }
+
+    return cvMat.clone();
+}
 
 cv::Mat Converter::toCvSE3(const Eigen::Matrix<double,3,3> &R, const Eigen::Matrix<double,3,1> &t)
 {
@@ -213,5 +231,19 @@ std::vector<float> Converter::toEuler(const cv::Mat &R)
 
     return v_euler;
 }
+
+    Sophus::SE3<float> Converter::toSophus(const cv::Mat &T) {
+        Eigen::Matrix<double,3,3> eigMat = toMatrix3d(T.rowRange(0,3).colRange(0,3));
+        Eigen::Quaternionf q(eigMat.cast<float>());
+
+        Eigen::Matrix<float,3,1> t = toVector3d(T.rowRange(0,3).col(3)).cast<float>();
+
+        return Sophus::SE3<float>(q,t);
+    }
+
+    Sophus::Sim3f Converter::toSophus(const g2o::Sim3& S) {
+        return Sophus::Sim3f(Sophus::RxSO3d((float)S.scale(), S.rotation().matrix()).cast<float>() ,
+                             S.translation().cast<float>());
+    }
 
 } //namespace ORB_SLAM

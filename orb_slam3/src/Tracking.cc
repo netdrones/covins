@@ -51,7 +51,8 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc,
 #if defined(WITH_VIEWER) && WITH_VIEWER
                    FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer,
 #endif // defined(WITH_VIEWER) && WITH_VIEWER
-                   Atlas *pAtlas, KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor, const string &_nameSeq):
+                   Atlas *pAtlas, KeyFrameDatabase* pKFDB, const string &strSettingPath,
+                   const int sensor, Settings* settings, const string &_nameSeq):
     mState(NO_IMAGES_YET), mSensor(sensor), mTrackedFr(0), mbStep(false),
     mbOnlyTracking(false), mbMapUpdated(false), mbVO(false), mpORBVocabulary(pVoc), mpKeyFrameDB(pKFDB),
     mpInitializer(static_cast<Initializer*>(NULL)), mpSystem(pSys),
@@ -63,43 +64,48 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc,
     mnInitialFrameId(0), mbCreatedMap(false), mnFirstFrameId(0), mpCamera2(nullptr)
 {
     // Load camera parameters from settings file
-    cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
+    if (settings) {
+        newParameterLoader(settings);
+    } else {
+        // Load camera parameters from settings file
+        cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
 
-    bool b_parse_cam = ParseCamParamFile(fSettings);
-    if(!b_parse_cam)
-    {
-        LOGE("Error with the camera parameters in the config file");
-    }
-
-    // Load ORB parameters
-    bool b_parse_orb = ParseORBParamFile(fSettings);
-    if(!b_parse_orb)
-    {
-        LOGE("Error with the ORB parameters in the config file");
-    }
-
-    initID = 0; lastID = 0;
-
-    // Load IMU parameters
-    bool b_parse_imu = true;
-    if(sensor==System::IMU_MONOCULAR || sensor==System::IMU_STEREO)
-    {
-        b_parse_imu = ParseIMUParamFile(fSettings);
-        if(!b_parse_imu)
+        bool b_parse_cam = ParseCamParamFile(fSettings);
+        if(!b_parse_cam)
         {
-            LOGE("Error with the IMU parameters in the config file");
+            LOGE("Error with the camera parameters in the config file");
         }
 
-        mnFramesToResetIMU = mMaxFrames;
-    }
+        // Load ORB parameters
+        bool b_parse_orb = ParseORBParamFile(fSettings);
+        if(!b_parse_orb)
+        {
+            LOGE("Error with the ORB parameters in the config file");
+        }
 
-    mbInitWith3KFs = false;
+        initID = 0; lastID = 0;
 
-    mnNumDataset = 0;
+        // Load IMU parameters
+        bool b_parse_imu = true;
+        if(sensor==System::IMU_MONOCULAR || sensor==System::IMU_STEREO)
+        {
+            b_parse_imu = ParseIMUParamFile(fSettings);
+            if(!b_parse_imu)
+            {
+                LOGE("Error with the IMU parameters in the config file");
+            }
 
-    if(!b_parse_cam || !b_parse_orb || !b_parse_imu)
-    {
-        LOGE("ERROR in the config file, the format is not correct");
+            mnFramesToResetIMU = mMaxFrames;
+        }
+
+        mbInitWith3KFs = false;
+
+        mnNumDataset = 0;
+
+        if(!b_parse_cam || !b_parse_orb || !b_parse_imu)
+        {
+            LOGE("ERROR in the config file, the format is not correct");
+        }
     }
 
 #ifdef REGISTER_TIMES
@@ -491,6 +497,94 @@ void Tracking::PrintTimeStats()
 }
 
 #endif
+
+void Tracking::newParameterLoader(Settings* settings) {
+    mpCamera = settings->camera1();
+    mpAtlas->AddCamera(mpCamera);
+
+    if(settings->needToUndistort()){
+        mDistCoef = settings->camera1DistortionCoef();
+    }
+    else{
+        mDistCoef = cv::Mat::zeros(4,1,CV_32F);
+    }
+
+    //TODO: missing image scaling and rectification
+    mImageScale = 1.0f;
+
+    mK = cv::Mat::eye(3,3,CV_32F);
+    mK.at<float>(0,0) = mpCamera->getParameter(0);
+    mK.at<float>(1,1) = mpCamera->getParameter(1);
+    mK.at<float>(0,2) = mpCamera->getParameter(2);
+    mK.at<float>(1,2) = mpCamera->getParameter(3);
+
+    mK_.setIdentity();
+    mK_(0,0) = mpCamera->getParameter(0);
+    mK_(1,1) = mpCamera->getParameter(1);
+    mK_(0,2) = mpCamera->getParameter(2);
+    mK_(1,2) = mpCamera->getParameter(3);
+
+    if((mSensor==System::STEREO || mSensor==System::IMU_STEREO || mSensor==System::IMU_RGBD) &&
+       settings->cameraType() == Settings::KannalaBrandt){
+        mpCamera2 = settings->camera2();
+        mpAtlas->AddCamera(mpCamera2);
+
+        // Workaround for converting back Sophus::SE3 to cv::Mat
+        mTlr = Converter::toCvMat(settings->Tlr());
+
+#if defined(WITH_VIEWER) && WITH_VIEWER
+        mpFrameDrawer->both = true;
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
+    }
+
+    if(mSensor==System::STEREO || mSensor==System::RGBD || mSensor==System::IMU_STEREO || mSensor==System::IMU_RGBD ){
+        mbf = settings->bf();
+        mThDepth = settings->b() * settings->thDepth();
+    }
+
+    if(mSensor==System::RGBD || mSensor==System::IMU_RGBD){
+        mDepthMapFactor = settings->depthMapFactor();
+        if(fabs(mDepthMapFactor)<1e-5)
+            mDepthMapFactor=1;
+        else
+            mDepthMapFactor = 1.0f/mDepthMapFactor;
+    }
+
+    mMinFrames = 0;
+    mMaxFrames = static_cast<int>(settings->fps());
+    mbRGB = settings->rgb();
+
+    //ORB parameters
+    int nFeatures = settings->nFeatures();
+    int nLevels = settings->nLevels();
+    int fIniThFAST = settings->initThFAST();
+    int fMinThFAST = settings->minThFAST();
+    float fScaleFactor = settings->scaleFactor();
+
+    mpORBextractorLeft = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
+
+    if(mSensor==System::STEREO || mSensor==System::IMU_STEREO)
+        mpORBextractorRight = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
+
+    if(mSensor==System::MONOCULAR || mSensor==System::IMU_MONOCULAR)
+        mpIniORBextractor = new ORBextractor(5*nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
+
+    //IMU parameters
+    auto Tbc = Converter::toCvMat(settings->Tbc());
+    mInsertKFsLost = settings->insertKFsWhenLost();
+    mImuFreq = settings->imuFrequency();
+    mImuPer = 0.001; //1.0 / (double) mImuFreq;     //TODO: ESTO ESTA BIEN?
+    float Ng = settings->noiseGyro();
+    float Na = settings->noiseAcc();
+    float Ngw = settings->gyroWalk();
+    float Naw = settings->accWalk();
+
+    const float sf = sqrt(mImuFreq);
+    mpImuCalib = new IMU::Calib(Tbc,Ng*sf,Na*sf,Ngw/sf,Naw/sf);
+
+
+    mpImuPreintegratedFromLastKF = new IMU::Preintegrated(IMU::Bias(),*mpImuCalib);
+}
 
 bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
 {
@@ -899,7 +993,8 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             else
             {
                 LOGE("Tlr matrix doesn't exist");
-                b_miss_params = true;
+                b_miss_params
+                = true;
             }
 
             if(!b_miss_params)

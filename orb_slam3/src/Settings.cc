@@ -29,6 +29,7 @@
 #include <opencv2/calib3d.hpp>
 
 #include <iostream>
+#include "Logger.h"
 
 using namespace std;
 
@@ -39,17 +40,17 @@ namespace ORB_SLAM3 {
         cv::FileNode node = fSettings[name];
         if(node.empty()){
             if(required){
-                std::cerr << name << " required parameter does not exist, aborting..." << std::endl;
+                LOGE("%s required parameter does not exist, aborting...", name.c_str());
                 exit(-1);
             }
             else{
-                std::cerr << name << " optional parameter does not exist..." << std::endl;
+                LOGD("%s optional parameter does not exist...", name.c_str());
                 found = false;
                 return 0.0f;
             }
         }
         else if(!node.isReal()){
-            std::cerr << name << " parameter must be a real number, aborting..." << std::endl;
+            LOGE("%s parameter must be a real number, aborting...", name.c_str());
             exit(-1);
         }
         else{
@@ -63,17 +64,17 @@ namespace ORB_SLAM3 {
         cv::FileNode node = fSettings[name];
         if(node.empty()){
             if(required){
-                std::cerr << name << " required parameter does not exist, aborting..." << std::endl;
+                LOGE("%s required parameter does not exist, aborting...", name.c_str());
                 exit(-1);
             }
             else{
-                std::cerr << name << " optional parameter does not exist..." << std::endl;
+                LOGD("%s optional parameter does not exist...", name.c_str());
                 found = false;
                 return 0;
             }
         }
         else if(!node.isInt()){
-            std::cerr << name << " parameter must be an integer number, aborting..." << std::endl;
+            LOGE("%s parameter must be an integer number, aborting...", name.c_str());
             exit(-1);
         }
         else{
@@ -87,17 +88,17 @@ namespace ORB_SLAM3 {
         cv::FileNode node = fSettings[name];
         if(node.empty()){
             if(required){
-                std::cerr << name << " required parameter does not exist, aborting..." << std::endl;
+                LOGE("%s required parameter does not exist, aborting...", name.c_str());
                 exit(-1);
             }
             else{
-                std::cerr << name << " optional parameter does not exist..." << std::endl;
+                LOGD("%s optional parameter does not exist...", name.c_str());
                 found = false;
                 return "";
             }
         }
         else if(!node.isString()){
-            std::cerr << name << " parameter must be a string, aborting..." << std::endl;
+            LOGE("%s parameter must be a string, aborting...", name.c_str());
             exit(-1);
         }
         else{
@@ -111,11 +112,11 @@ namespace ORB_SLAM3 {
         cv::FileNode node = fSettings[name];
         if(node.empty()){
             if(required){
-                std::cerr << name << " required parameter does not exist, aborting..." << std::endl;
+                LOGE("%s required parameter does not exist, aborting...", name.c_str());
                 exit(-1);
             }
             else{
-                std::cerr << name << " optional parameter does not exist..." << std::endl;
+                LOGD("%s optional parameter does not exist...", name.c_str());
                 found = false;
                 return {};
             }
@@ -133,54 +134,57 @@ namespace ORB_SLAM3 {
         //Open settings file
         cv::FileStorage fSettings(configFile, cv::FileStorage::READ);
         if (!fSettings.isOpened()) {
-            cerr << "[ERROR]: could not open configuration file at: " << configFile << endl;
-            cerr << "Aborting..." << endl;
+            LOGE("[ERROR]: could not open configuration file at: %s", configFile.c_str());
+            LOGE("Aborting...");
 
             exit(-1);
         }
         else{
             cout << "Loading settings from " << configFile << endl;
+            LOGD("Loading settings from %s", configFile.c_str());
         }
 
         //Read first camera
         readCamera1(fSettings);
-        cout << "\t-Loaded camera 1" << endl;
+//        LOGV("Loaded camera 1");
 
         //Read second camera if stereo (not rectified)
         if(sensor_ == System::STEREO || sensor_ == System::IMU_STEREO){
             readCamera2(fSettings);
-            cout << "\t-Loaded camera 2" << endl;
+//            cout << "\t-Loaded camera 2" << endl;
+//            LOGV("Loaded camera 2");
         }
 
         //Read image info
         readImageInfo(fSettings);
-        cout << "\t-Loaded image info" << endl;
+//        LOGV("Loaded image info");
 
         if(sensor_ == System::IMU_MONOCULAR || sensor_ == System::IMU_STEREO || sensor_ == System::IMU_RGBD){
             readIMU(fSettings);
-            cout << "\t-Loaded IMU calibration" << endl;
+//            LOGV("Loaded IMU calibration");
         }
 
         if(sensor_ == System::RGBD || sensor_ == System::IMU_RGBD){
             readRGBD(fSettings);
-            cout << "\t-Loaded RGB-D calibration" << endl;
+//            LOGV("Loaded RGB-D calibration");
         }
 
         readORB(fSettings);
-        cout << "\t-Loaded ORB settings" << endl;
+//        LOGV("Loaded ORB settings");
+//        cout << "\t-Loaded ORB settings" << endl;
+#if 0
         readViewer(fSettings);
         cout << "\t-Loaded viewer settings" << endl;
         readLoadAndSave(fSettings);
         cout << "\t-Loaded Atlas settings" << endl;
         readOtherParameters(fSettings);
         cout << "\t-Loaded misc parameters" << endl;
-
+#endif // if 0
         if(bNeedToRectify_){
             precomputeRectificationMaps();
-            cout << "\t-Computed rectification maps" << endl;
+//            LOGV("Computed rectification maps");
         }
-
-        cout << "----------------------------------" << endl;
+//        cout << "----------------------------------" << endl;
     }
 
     void Settings::readCamera1(cv::FileStorage &fSettings) {

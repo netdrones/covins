@@ -59,6 +59,9 @@ System::System(const string &strVocFile,
     mbReset(false), mbResetActiveMap(false),
     mbActivateLocalizationMode(false), mbDeactivateLocalizationMode(false)
 {
+
+    LOGD("Initialize ORB_SLAM3");
+
     // Output welcome message
     cout << endl <<
     "ORB-SLAM3 Copyright (C) 2017-2020 Carlos Campos, Richard Elvira, Juan J. Gómez, José M.M. Montiel and Juan D. Tardós, University of Zaragoza." << endl <<
@@ -94,7 +97,6 @@ System::System(const string &strVocFile,
 
 //        mStrLoadAtlasFromFile = settings_->atlasLoadFile();
 //        mStrSaveAtlasToFile = settings_->atlasSaveFile();
-
 //        cout << (*settings_) << endl;
     }
 #if 0

@@ -26,6 +26,7 @@
 #include "CameraModels/GeometricCamera.h"
 #include "Sophus/sophus/se3.hpp"
 
+#include <opencv2/core/core.hpp>
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -74,6 +75,7 @@ namespace ORB_SLAM3 {
         cv::Mat camera2DistortionCoef() {return cv::Mat(vPinHoleDistorsion2_.size(),1,CV_32F,vPinHoleDistorsion1_.data());}
 
         Sophus::SE3f Tlr() {return Tlr_;}
+        cv::Mat cvTlr() { return cvTlr_; }
         float bf() {return bf_;}
         float b() {return b_;}
         float thDepth() {return thDepth_;}
@@ -92,6 +94,7 @@ namespace ORB_SLAM3 {
         float accWalk() {return accWalk_;}
         float imuFrequency() {return imuFrequency_;}
         Sophus::SE3f Tbc() {return Tbc_;}
+        cv::Mat cvTbc() {return cvTbc_;}
         bool insertKFsWhenLost() {return insertKFsWhenLost_;}
 
         float depthMapFactor() {return depthMapFactor_;}
@@ -177,6 +180,7 @@ namespace ORB_SLAM3 {
         bool bNeedToResize1_, bNeedToResize2_;
 
         Sophus::SE3f Tlr_;
+        cv::Mat cvTlr_;
         float thDepth_;
         float bf_, b_;
 
@@ -193,6 +197,7 @@ namespace ORB_SLAM3 {
         float gyroWalk_, accWalk_;
         float imuFrequency_;
         Sophus::SE3f Tbc_;
+        cv::Mat cvTbc_;
         bool insertKFsWhenLost_;
 
         /*

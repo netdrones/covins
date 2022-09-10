@@ -55,7 +55,7 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc,
                    const int sensor, Settings* settings, const string &_nameSeq):
     mState(NO_IMAGES_YET), mSensor(sensor), mTrackedFr(0), mbStep(false),
     mbOnlyTracking(false), mbMapUpdated(false), mbVO(false), mpORBVocabulary(pVoc), mpKeyFrameDB(pKFDB),
-    mpInitializer(static_cast<Initializer*>(NULL)), mpSystem(pSys),
+    mpInitializer(nullptr), mpSystem(pSys),
 #if defined(WITH_VIEWER) && WITH_VIEWER
     mpViewer(NULL),
     mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer),
@@ -528,9 +528,7 @@ void Tracking::newParameterLoader(Settings* settings) {
        settings->cameraType() == Settings::KannalaBrandt){
         mpCamera2 = settings->camera2();
         mpAtlas->AddCamera(mpCamera2);
-
-        // Workaround for converting back Sophus::SE3 to cv::Mat
-        mTlr = Converter::toCvMat(settings->Tlr());
+        mTlr = settings->cvTlr();
 
 #if defined(WITH_VIEWER) && WITH_VIEWER
         mpFrameDrawer->both = true;
@@ -555,11 +553,11 @@ void Tracking::newParameterLoader(Settings* settings) {
     mbRGB = settings->rgb();
 
     //ORB parameters
-    int nFeatures = settings->nFeatures();
-    int nLevels = settings->nLevels();
-    int fIniThFAST = settings->initThFAST();
-    int fMinThFAST = settings->minThFAST();
-    float fScaleFactor = settings->scaleFactor();
+    auto nFeatures = settings->nFeatures();
+    auto nLevels = settings->nLevels();
+    auto fIniThFAST = settings->initThFAST();
+    auto fMinThFAST = settings->minThFAST();
+    auto fScaleFactor = settings->scaleFactor();
 
     mpORBextractorLeft = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
 
@@ -570,7 +568,7 @@ void Tracking::newParameterLoader(Settings* settings) {
         mpIniORBextractor = new ORBextractor(5*nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
 
     //IMU parameters
-    auto Tbc = Converter::toCvMat(settings->Tbc());
+    auto Tbc = settings->cvTbc();
     mInsertKFsLost = settings->insertKFsWhenLost();
     mImuFreq = settings->imuFrequency();
     mImuPer = 0.001; //1.0 / (double) mImuFreq;     //TODO: ESTO ESTA BIEN?
@@ -646,7 +644,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         node = fSettings["Camera.k1"];
         if(!node.empty() && node.isReal())
         {
-            mDistCoef.at<float>(0) = node.real();
+            mDistCoef.at<float>(0) = static_cast<float>(node.real());
         }
         else
         {
@@ -1507,7 +1505,7 @@ void Tracking::PreintegrateIMU()
 
     mvImuFromLastFrame.clear();
     mvImuFromLastFrame.reserve(mlQueueImuData.size());
-    if(mlQueueImuData.size() == 0)
+    if(mlQueueImuData.empty())
     {
         Verbose::PrintMess("Not IMU data in mlQueueImuData!!", Verbose::VERBOSITY_NORMAL);
         mCurrentFrame.setIntegrated();
@@ -1590,7 +1588,7 @@ void Tracking::PreintegrateIMU()
         }
 
         if (!mpImuPreintegratedFromLastKF)
-            cout << "mpImuPreintegratedFromLastKF does not exist" << endl;
+            LOGD("mpImuPreintegratedFromLastKF does not exist");
         mpImuPreintegratedFromLastKF->IntegrateNewMeasurement(acc,angVel,tstep);
         pImuPreintegratedFromLastFrame->IntegrateNewMeasurement(acc,angVel,tstep);
     }
@@ -1653,8 +1651,9 @@ bool Tracking::PredictStateIMU()
         mCurrentFrame.mPredBias = mCurrentFrame.mImuBias;
         return true;
     }
-    else
-        cout << "not IMU prediction!!" << endl;
+    else {
+        LOGW("not IMU prediction!!");
+    }
 
     return false;
 }
@@ -1774,7 +1773,7 @@ void Tracking::Track()
 
     if(mpLocalMapper->mbBadImu)
     {
-        cout << "TRACK: Reset map because local mapper set the bad imu flag " << endl;
+        LOGW("TRACK: Reset map because local mapper set the bad imu flag ");
         mpSystem->ResetActiveMap();
         return;
     }
@@ -1785,7 +1784,7 @@ void Tracking::Track()
     {
         if(mLastFrame.mTimeStamp>mCurrentFrame.mTimeStamp)
         {
-            cerr << "ERROR: Frame with a timestamp older than previous frame detected!" << endl;
+            LOGE("ERROR: Frame with a timestamp older than previous frame detected!");
             unique_lock<mutex> lock(mMutexImuQueue);
             mlQueueImuData.clear();
             CreateMapInAtlas();
@@ -1797,8 +1796,8 @@ void Tracking::Track()
         else if(mCurrentFrame.mTimeStamp>mLastFrame.mTimeStamp+1.0)
         #endif
         {
-            cout << "id last: " << mLastFrame.mnId << "    id curr: " << mCurrentFrame.mnId << endl;
-            std::cout << "Timestamp diff: " << mCurrentFrame.mTimeStamp - mLastFrame.mTimeStamp << std::endl;
+            LOGD("id last: %lu, id curr: %lu", mLastFrame.mnId, mCurrentFrame.mnId);
+            LOGD("Timestamp diff: %lf", mCurrentFrame.mTimeStamp - mLastFrame.mTimeStamp);
             if(mpAtlas->isInertial())
             {
                 #ifdef COVINS_MOD
@@ -1811,7 +1810,7 @@ void Tracking::Track()
                 #endif
                 if(mpAtlas->isImuInitialized())
                 {
-                    cout << "Timestamp jump detected. State set to LOST. Reseting IMU integration..." << endl;
+                    LOGW("Timestamp jump detected. State set to LOST. Resetting IMU integration...");
                     if(!pCurrentMap->GetIniertialBA2())
                     {
                         mpSystem->ResetActiveMap();
@@ -1823,7 +1822,7 @@ void Tracking::Track()
                 }
                 else
                 {
-                    cout << "Timestamp jump detected, before IMU initialization. Reseting..." << endl;
+                    LOGW("Timestamp jump detected, before IMU initialization. Resetting...");
                     mpSystem->ResetActiveMap();
                 }
             }
@@ -1948,7 +1947,7 @@ void Tracking::Track()
                     }
                     else if(pCurrentMap->KeyFramesInMap()>10)
                     {
-                        cout << "KF in map: " << pCurrentMap->KeyFramesInMap() << endl;
+                        LOGD("KF in map: %lu", pCurrentMap->KeyFramesInMap());
                         mState = RECENTLY_LOST;
                         mTimeStampLost = mCurrentFrame.mTimeStamp;
                         //mCurrentFrame.SetPose(mLastFrame.mTcw);
@@ -1978,6 +1977,7 @@ void Tracking::Track()
                         {
                             mState = LOST;
                             Verbose::PrintMess("Track Lost...", Verbose::VERBOSITY_NORMAL);
+                            LOGW("Track Lost...");
                             bOK=false;
                         }
                     }
@@ -1989,6 +1989,7 @@ void Tracking::Track()
                         {
                             mState = LOST;
                             Verbose::PrintMess("Track Lost...", Verbose::VERBOSITY_NORMAL);
+                            LOGW("Track Lost...");
                             bOK=false;
                         }
                     }
@@ -1997,11 +1998,12 @@ void Tracking::Track()
                 {
 
                     Verbose::PrintMess("A new map is started...", Verbose::VERBOSITY_NORMAL);
+                    LOGD("A new map is started...");
 
                     if (pCurrentMap->KeyFramesInMap()<10)
                     {
                         mpSystem->ResetActiveMap();
-                        cout << "Reseting current map..." << endl;
+                        LOGD("Reseting current map...");
                     }else
                         CreateMapInAtlas();
 
@@ -2110,7 +2112,7 @@ void Tracking::Track()
 
             }
             if(!bOK)
-                cout << "Fail to track local map!" << endl;
+                LOGW("Fail to track local map!");
         }
         else
         {
@@ -2130,7 +2132,7 @@ void Tracking::Track()
                 Verbose::PrintMess("Track lost for less than one second...", Verbose::VERBOSITY_NORMAL);
                 if(!pCurrentMap->isImuInitialized() || !pCurrentMap->GetIniertialBA2())
                 {
-                    cout << "IMU is not or recently initialized. Reseting active map..." << endl;
+                    LOGW("IMU is not or recently initialized. Reseting active map...");
                     mpSystem->ResetActiveMap();
                 }
 
@@ -2163,7 +2165,7 @@ void Tracking::Track()
             {
                 if(mCurrentFrame.mnId==(mnLastRelocFrameId+mnFramesToResetIMU))
                 {
-                    cout << "RESETING FRAME!!!" << endl;
+                    LOGW("RESETING FRAME!!!");
                 }
                 else if(mCurrentFrame.mnId>(mnLastRelocFrameId+30))
                     mLastBias = mCurrentFrame.mImuBias;
@@ -2263,7 +2265,7 @@ void Tracking::Track()
             if ((mSensor == System::IMU_MONOCULAR) || (mSensor == System::IMU_STEREO))
                 if (!pCurrentMap->isImuInitialized())
                 {
-                    Verbose::PrintMess("Track lost before IMU initialisation, reseting...", Verbose::VERBOSITY_QUIET);
+                    Verbose::PrintMess("Track lost before IMU initialisation, resetting...", Verbose::VERBOSITY_QUIET);
                     mpSystem->ResetActiveMap();
                     return;
                 }
@@ -2312,13 +2314,13 @@ void Tracking::StereoInitialization()
         {
             if (!mCurrentFrame.mpImuPreintegrated || !mLastFrame.mpImuPreintegrated)
             {
-                cout << "not IMU meas" << endl;
+                LOGW("not IMU meas");
                 return;
             }
 
             if (cv::norm(mCurrentFrame.mpImuPreintegratedFrame->avgA-mLastFrame.mpImuPreintegratedFrame->avgA)<0.5)
             {
-                cout << "not enough acceleration" << endl;
+                LOGW("not enough acceleration: %f", cv::norm(mCurrentFrame.mpImuPreintegratedFrame->avgA-mLastFrame.mpImuPreintegratedFrame->avgA));
                 return;
             }
 
@@ -2388,6 +2390,7 @@ void Tracking::StereoInitialization()
         }
 
         Verbose::PrintMess("New Map created with " + to_string(mpAtlas->MapPointsInMap()) + " points", Verbose::VERBOSITY_QUIET);
+        LOGD("New Map created with %s points", to_string(mpAtlas->MapPointsInMap()).c_str());
 
         mpLocalMapper->InsertKeyFrame(pKFini);
 
@@ -2510,7 +2513,7 @@ void Tracking::CreateInitialMapMonocular()
     KeyFrame* pKFcur = new KeyFrame(mCurrentFrame,mpAtlas->GetCurrentMap(),mpKeyFrameDB);
 
     if(mSensor == System::IMU_MONOCULAR)
-        pKFini->mpImuPreintegrated = (IMU::Preintegrated*)(NULL);
+        pKFini->mpImuPreintegrated = nullptr;
 
 
     pKFini->ComputeBoW();
@@ -2718,7 +2721,7 @@ bool Tracking::TrackReferenceKeyFrame()
 
     if(nmatches<15)
     {
-        cout << "TRACK_REF_KF: Less than 15 matches!!\n";
+        LOGW("TRACK_REF_KF: Less than 15 matches!!");
         return false;
     }
 
@@ -3767,7 +3770,7 @@ bool Tracking::Relocalization()
     else
     {
         mnLastRelocFrameId = mCurrentFrame.mnId;
-        cout << "Relocalized!!" << endl;
+        LOGD("Relocalized!!");
         return true;
     }
 

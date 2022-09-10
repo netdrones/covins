@@ -347,6 +347,7 @@ namespace ORB_SLAM3 {
         }
         else{
             cv::Mat cvTlr = readParameter<cv::Mat>(fSettings,"Stereo.T_c1_c2",found);
+            cvTlr_ = cvTlr;
             Tlr_ = Converter::toSophus(cvTlr);
 
             //TODO: also search for Trl and invert if necessary
@@ -427,6 +428,7 @@ namespace ORB_SLAM3 {
         imuFrequency_ = readParameter<float>(fSettings,"IMU.Frequency",found);
 
         cv::Mat cvTbc = readParameter<cv::Mat>(fSettings,"IMU.T_b_c1",found);
+        cvTbc_ = cvTbc;
         Tbc_ = Converter::toSophus(cvTbc);
 
         readParameter<int>(fSettings,"IMU.InsertKFsWhenLost",found,false);

@@ -103,6 +103,7 @@ LOCAL_EXPORT_C_INCLUDES := \
 	$(SRC_ABS)/include/comm \
 	$(SRC_ABS)/ThirdParty \
 	$(ROOT_ABS)/covins_comm/include \
+	$(ROOT_ABS)/covins_comm/thirdparty \
 
 LOCAL_EXPORT_LDLIBS := \
     -llog \

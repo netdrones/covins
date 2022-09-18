@@ -22,7 +22,8 @@ LOCAL_C_INCLUDES := \
 	$(COVINS_COMM_INCLUDE_DIR) \
 	$(SRC_ABS)/include/comm \
 	$(SRC_ABS)/ThirdParty \
-	$(SRC_ABS)/../covins_comm/include/covins
+	$(SRC_ABS)/../covins_comm/include/covins \
+	$(SRC_ABS)/../covins_comm/thirdparty \
 
 # ORB_SLAM3
 LOCAL_SRC_FILES := \

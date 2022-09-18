@@ -337,7 +337,7 @@ namespace ORB_SLAM3 {
             int colEnd = readParameter<int>(fSettings,"Camera2.overlappingEnd",found);
             vector<int> vOverlapping = {colBegin, colEnd};
 
-            static_cast<KannalaBrandt8*>(calibration2_)->mvLappingArea = vOverlapping;
+            dynamic_cast<KannalaBrandt8*>(calibration2_)->mvLappingArea = vOverlapping;
         }
 
         //Load stereo extrinsic calibration
@@ -617,8 +617,8 @@ namespace ORB_SLAM3 {
             output << "\t-Stereo depth threshold : " << settings.thDepth_ << endl;
 
             if(settings.cameraType_ == Settings::KannalaBrandt){
-                auto vOverlapping1 = static_cast<KannalaBrandt8*>(settings.calibration1_)->mvLappingArea;
-                auto vOverlapping2 = static_cast<KannalaBrandt8*>(settings.calibration2_)->mvLappingArea;
+                auto vOverlapping1 = dynamic_cast<KannalaBrandt8*>(settings.calibration1_)->mvLappingArea;
+                auto vOverlapping2 = dynamic_cast<KannalaBrandt8*>(settings.calibration2_)->mvLappingArea;
                 output << "\t-Camera 1 overlapping area: [ " << vOverlapping1[0] << " , " << vOverlapping1[1] << " ]" << endl;
                 output << "\t-Camera 2 overlapping area: [ " << vOverlapping2[0] << " , " << vOverlapping2[1] << " ]" << endl;
             }

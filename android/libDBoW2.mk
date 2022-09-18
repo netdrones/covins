@@ -13,8 +13,8 @@ LOCAL_SRC_FILES := \
 	$(PROJ_ROOT_REL)/DBoW2/FORB.cpp \
 	$(PROJ_ROOT_REL)/DBoW2/FeatureVector.cpp \
 	$(PROJ_ROOT_REL)/DBoW2/ScoringObject.cpp \
-	$(PROJ_ROOT_REL)/DUTils/Random.cpp \
-	$(PROJ_ROOT_REL)/DUTils/Timestamp.cpp \
+	$(PROJ_ROOT_REL)/DUtils/Random.cpp \
+	$(PROJ_ROOT_REL)/DUtils/Timestamp.cpp \
 
 LOCAL_STATIC_LIBRARIES := \
 	boost_system \

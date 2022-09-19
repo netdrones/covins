@@ -21,7 +21,7 @@ LOCAL_C_INCLUDES := \
 	$(EIGEN3_INCLUDE_DIR) \
 	$(COVINS_COMM_INCLUDE_DIR) \
 	$(SRC_ABS)/include/comm \
-	$(SRC_ABS)/ThirdParty \
+	$(SRC_ABS)/Thirdparty \
 	$(SRC_ABS)/../covins_comm/include/covins \
 	$(SRC_ABS)/../covins_comm/thirdparty \
 
@@ -101,7 +101,7 @@ LOCAL_EXPORT_C_INCLUDES := \
 	$(EIGEN3_INCLUDE_DIR) \
 	$(COVINS_COMM_INCLUDE_DIR) \
 	$(SRC_ABS)/include/comm \
-	$(SRC_ABS)/ThirdParty \
+	$(SRC_ABS)/Thirdparty \
 	$(ROOT_ABS)/covins_comm/include \
 	$(ROOT_ABS)/covins_comm/thirdparty \
 

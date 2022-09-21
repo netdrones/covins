@@ -58,19 +58,19 @@ Atlas::~Atlas()
 void Atlas::CreateNewMap()
 {
     unique_lock<mutex> lock(mMutexAtlas);
-    cout << "Creation of new map with id: " << Map::nNextId << endl;
+    LOGD("Creation of new map with id: %ld", Map::nNextId);
     if(mpCurrentMap){
-        cout << "Exits current map " << endl;
+        LOGD("Exits current map ");
         if(!mspMaps.empty() && mnLastInitKFidMap < mpCurrentMap->GetMaxKFid())
             mnLastInitKFidMap = mpCurrentMap->GetMaxKFid()+1; //The init KF is the next of current maximum
 
         mpCurrentMap->SetStoredMap();
-        cout << "Saved map with ID: " << mpCurrentMap->GetId() << endl;
+        LOGD("Saved map with ID: %ld", mpCurrentMap->GetId());
 
         //if(mHasViewer)
         //    mpViewer->AddMapToCreateThumbnail(mpCurrentMap);
     }
-    cout << "Creation of new map with last KF id: " << mnLastInitKFidMap << endl;
+    LOGD("Creation of new map with last KF id: %ld", mnLastInitKFidMap);
 
     mpCurrentMap = new Map(mnLastInitKFidMap);
     mpCurrentMap->SetCurrentMap();
@@ -80,7 +80,7 @@ void Atlas::CreateNewMap()
 void Atlas::ChangeMap(Map* pMap)
 {
     unique_lock<mutex> lock(mMutexAtlas);
-    cout << "Chage to map with id: " << pMap->GetId() << endl;
+    LOGD("Change to map with id: %ld", pMap->GetId());
     if(mpCurrentMap){
         mpCurrentMap->SetStoredMap();
     }

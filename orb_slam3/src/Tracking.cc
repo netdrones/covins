@@ -2308,13 +2308,14 @@ void Tracking::Track()
 
 void Tracking::StereoInitialization()
 {
+    LOGD("StereoInitialization");
     if(mCurrentFrame.N>500)
     {
         if (mSensor == System::IMU_STEREO)
         {
             if (!mCurrentFrame.mpImuPreintegrated || !mLastFrame.mpImuPreintegrated)
             {
-                LOGW("not IMU meas");
+//                LOGW("not IMU meas");
                 return;
             }
 
@@ -2389,8 +2390,8 @@ void Tracking::StereoInitialization()
             }
         }
 
-        Verbose::PrintMess("New Map created with " + to_string(mpAtlas->MapPointsInMap()) + " points", Verbose::VERBOSITY_QUIET);
-        LOGD("New Map created with %s points", to_string(mpAtlas->MapPointsInMap()).c_str());
+//        Verbose::PrintMess("New Map created with " + to_string(mpAtlas->MapPointsInMap()) + " points", Verbose::VERBOSITY_QUIET);
+        LOGD("New Map created with %ld points", mpAtlas->MapPointsInMap());
 
         mpLocalMapper->InsertKeyFrame(pKFini);
 

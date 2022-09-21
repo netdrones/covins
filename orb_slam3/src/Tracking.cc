@@ -2308,7 +2308,6 @@ void Tracking::Track()
 
 void Tracking::StereoInitialization()
 {
-    LOGD("StereoInitialization");
     if(mCurrentFrame.N>500)
     {
         if (mSensor == System::IMU_STEREO)
@@ -2390,30 +2389,30 @@ void Tracking::StereoInitialization()
             }
         }
 
-//        Verbose::PrintMess("New Map created with " + to_string(mpAtlas->MapPointsInMap()) + " points", Verbose::VERBOSITY_QUIET);
         LOGD("New Map created with %ld points", mpAtlas->MapPointsInMap());
+        if (mpAtlas->MapPointsInMap() > 0) {
+            mpLocalMapper->InsertKeyFrame(pKFini);
 
-        mpLocalMapper->InsertKeyFrame(pKFini);
+            mLastFrame = Frame(mCurrentFrame);
+            mnLastKeyFrameId=mCurrentFrame.mnId;
+            mpLastKeyFrame = pKFini;
+            mnLastRelocFrameId = mCurrentFrame.mnId;
 
-        mLastFrame = Frame(mCurrentFrame);
-        mnLastKeyFrameId=mCurrentFrame.mnId;
-        mpLastKeyFrame = pKFini;
-        mnLastRelocFrameId = mCurrentFrame.mnId;
+            mvpLocalKeyFrames.push_back(pKFini);
+            mvpLocalMapPoints=mpAtlas->GetAllMapPoints();
+            mpReferenceKF = pKFini;
+            mCurrentFrame.mpReferenceKF = pKFini;
 
-        mvpLocalKeyFrames.push_back(pKFini);
-        mvpLocalMapPoints=mpAtlas->GetAllMapPoints();
-        mpReferenceKF = pKFini;
-        mCurrentFrame.mpReferenceKF = pKFini;
+            mpAtlas->SetReferenceMapPoints(mvpLocalMapPoints);
 
-        mpAtlas->SetReferenceMapPoints(mvpLocalMapPoints);
-
-        mpAtlas->GetCurrentMap()->mvpKeyFrameOrigins.push_back(pKFini);
+            mpAtlas->GetCurrentMap()->mvpKeyFrameOrigins.push_back(pKFini);
 
 #if defined(WITH_VIEWER) && WITH_VIEWER
-        mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
+            mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
 #endif // defined(WITH_VIEWER) && WITH_VIEWER
 
-        mState=OK;
+            mState=OK;
+        }
     }
 }
 

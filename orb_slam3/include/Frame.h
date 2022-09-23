@@ -128,10 +128,10 @@ public:
     cv::Mat mOw;
 public:
     // Vocabulary used for relocalization.
-    ORBVocabulary* mpORBvocabulary;
+    ORBVocabulary* mpORBvocabulary = nullptr;
 
     // Feature extractor. The right is used only in the stereo case.
-    ORBextractor* mpORBextractorLeft, *mpORBextractorRight;
+    ORBextractor* mpORBextractorLeft = nullptr, *mpORBextractorRight = nullptr;
 
     // Frame timestamp.
     double mTimeStamp;
@@ -205,19 +205,19 @@ public:
     IMU::Calib mImuCalib;
 
     // Imu preintegration from last keyframe
-    IMU::Preintegrated* mpImuPreintegrated;
-    KeyFrame* mpLastKeyFrame;
+    IMU::Preintegrated* mpImuPreintegrated = nullptr;
+    KeyFrame* mpLastKeyFrame = nullptr;
 
     // Pointer to previous frame
-    Frame* mpPrevFrame;
-    IMU::Preintegrated* mpImuPreintegratedFrame;
+    Frame* mpPrevFrame = nullptr;
+    IMU::Preintegrated* mpImuPreintegratedFrame = nullptr;
 
     // Current and Next Frame id.
     static long unsigned int nNextId;
     long unsigned int mnId;
 
     // Reference Keyframe.
-    KeyFrame* mpReferenceKF;
+    KeyFrame* mpReferenceKF = nullptr;
 
     // Scale pyramid info.
     int mnScaleLevels;

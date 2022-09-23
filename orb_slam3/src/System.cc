@@ -149,7 +149,7 @@ System::System(const string &strVocFile,
     //Initialize the Tracking thread
     //(it will live in the main thread of execution, the one that called this constructor)
 //    cout << "Seq. Name: " << strSequence << endl;
-    LOGD("Seq. Name: %s", strSequence.c_str());
+//    LOGD("Seq. Name: %s", strSequence.c_str());
 #if defined(WITH_VIEWER) && WITH_VIEWER
     mpTracker = new Tracking(this, mpVocabulary, mpFrameDrawer, mpMapDrawer,
                              mpAtlas, mpKeyFrameDatabase, strSettingsFile, mSensor, settings_, strSequence);

@@ -78,6 +78,7 @@ public:
     Bias(const float &b_acc_x, const float &b_acc_y, const float &b_acc_z,
             const float &b_ang_vel_x, const float &b_ang_vel_y, const float &b_ang_vel_z):
             bax(b_acc_x), bay(b_acc_y), baz(b_acc_z), bwx(b_ang_vel_x), bwy(b_ang_vel_y), bwz(b_ang_vel_z){}
+    Bias(const Bias& b): bax(b.bax), bay(b.bay), baz(b.baz), bwx(b.bwx), bwy(b.bwy), bwz(b.bwz) {}
     void CopyFrom(Bias &b);
     friend std::ostream& operator<< (std::ostream &out, const Bias &b);
 

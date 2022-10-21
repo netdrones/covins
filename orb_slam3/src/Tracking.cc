@@ -1600,7 +1600,8 @@ void Tracking::PreintegrateIMU()
 
     mCurrentFrame.setIntegrated();
 
-    Verbose::PrintMess("Preintegration is finished!! ", Verbose::VERBOSITY_DEBUG);
+    LOGD("Preintegration is finished!!");
+//    Verbose::PrintMess("Preintegration is finished!! ", Verbose::VERBOSITY_DEBUG);
 }
 
 
@@ -1762,7 +1763,6 @@ void Tracking::ComputeVelocitiesAccBias(const vector<Frame*> &vpFs, float &bax, 
 
 void Tracking::Track()
 {
-
 #if defined(WITH_VIEWER) && WITH_VIEWER
     if (bStepByStep)
     {
@@ -1868,7 +1868,7 @@ void Tracking::Track()
     int nMapChangeIndex = pCurrentMap->GetLastMapChange();
     if(nCurMapChangeIndex>nMapChangeIndex)
     {
-        // cout << "Map update detected" << endl;
+        LOGD("Map update detected");
         pCurrentMap->SetLastMapChange(nCurMapChangeIndex);
         mbMapUpdated = true;
     }
@@ -1989,7 +1989,6 @@ void Tracking::Track()
                         {
                             mState = LOST;
                             Verbose::PrintMess("Track Lost...", Verbose::VERBOSITY_NORMAL);
-                            LOGW("Track Lost...");
                             bOK=false;
                         }
                     }
@@ -2131,7 +2130,7 @@ void Tracking::Track()
                 Verbose::PrintMess("Track lost for less than one second...", Verbose::VERBOSITY_NORMAL);
                 if(!pCurrentMap->isImuInitialized() || !pCurrentMap->GetIniertialBA2())
                 {
-                    LOGW("IMU is not or recently initialized. Reseting active map...");
+                    LOGW("IMU is not or recently initialized. Resetting active map...");
                     mpSystem->ResetActiveMap();
                 }
 
@@ -2313,8 +2312,7 @@ void Tracking::StereoInitialization()
         {
             if (!mCurrentFrame.mpImuPreintegrated || !mLastFrame.mpImuPreintegrated)
             {
-//                LOGW("not IMU meas");
-//                Verbose::PrintMess("not IMU meas", Verbose::VERBOSITY_DEBUG);
+                Verbose::PrintMess("not IMU meas", Verbose::VERBOSITY_DEBUG);
                 return;
             }
 
@@ -2325,6 +2323,7 @@ void Tracking::StereoInitialization()
             }
 
             delete mpImuPreintegratedFromLastKF;
+
             mpImuPreintegratedFromLastKF = new IMU::Preintegrated(IMU::Bias(),*mpImuCalib);
             mCurrentFrame.mpImuPreintegrated = mpImuPreintegratedFromLastKF;
         }
@@ -2387,10 +2386,10 @@ void Tracking::StereoInitialization()
             }
         }
 
-//        LOGD("New Map created with %ld points", mpAtlas->MapPointsInMap());
+        LOGD("New Map created with %ld points", mpAtlas->MapPointsInMap());
         mpLocalMapper->InsertKeyFrame(pKFini);
 
-        mLastFrame = mCurrentFrame;
+        mLastFrame = Frame(mCurrentFrame);
         mnLastKeyFrameId=mCurrentFrame.mnId;
         mpLastKeyFrame = pKFini;
         mnLastRelocFrameId = mCurrentFrame.mnId;
@@ -2712,7 +2711,7 @@ bool Tracking::TrackReferenceKeyFrame()
 
     if(nmatches<15)
     {
-        LOGW("TRACK_REF_KF: Less than 15 matches!!");
+        LOGW("TRACK_REF_KF: Less than 15 matches!! (%d matches)", nmatches);
         return false;
     }
 
@@ -3230,7 +3229,7 @@ void Tracking::CreateNewKeyFrame()
         mpImuPreintegratedFromLastKF = new IMU::Preintegrated(pKF->GetImuBias(),pKF->mImuCalib);
     }
 
-    if(mSensor!=System::MONOCULAR && mSensor != System::IMU_MONOCULAR) // TODO check if incluide imu_stereo
+    if(mSensor!=System::MONOCULAR && mSensor != System::IMU_MONOCULAR) // TODO check if include imu_stereo
     {
         mCurrentFrame.UpdatePoseMatrices();
         // cout << "create new MPs" << endl;
@@ -3899,7 +3898,7 @@ void Tracking::ResetActiveMap(bool bLocMap)
 
     list<bool> lbLost;
     unsigned int index = mnFirstFrameId;
-    cout << "mnFirstFrameId = " << mnFirstFrameId << endl;
+    LOGV("mnFirstFrameId = %d", mnFirstFrameId);
     for(Map* pMap : mpAtlas->GetAllMaps())
     {
         if(pMap->GetAllKeyFrames().size() > 0)
@@ -3910,9 +3909,9 @@ void Tracking::ResetActiveMap(bool bLocMap)
     }
 
     int num_lost = 0;
-    cout << "mnInitialFrameId = " << mnInitialFrameId << endl;
+    LOGV("mnInitialFrameId = %d", mnInitialFrameId);
 
-    for(list<bool>::iterator ilbL = mlbLost.begin(); ilbL != mlbLost.end(); ilbL++)
+    for (auto ilbL = mlbLost.begin(); ilbL != mlbLost.end(); ilbL++)
     {
         if(index < mnInitialFrameId)
             lbLost.push_back(*ilbL);
@@ -3924,7 +3923,7 @@ void Tracking::ResetActiveMap(bool bLocMap)
 
         index++;
     }
-    cout << num_lost << " Frames set to lost" << endl;
+    LOGD("%d Frames set to lost", num_lost);
 
     mlbLost = lbLost;
 

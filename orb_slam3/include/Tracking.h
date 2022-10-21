@@ -234,7 +234,7 @@ protected:
     bool mbMapUpdated;
 
     // Imu preintegration from last frame
-    IMU::Preintegrated *mpImuPreintegratedFromLastKF;
+    IMU::Preintegrated *mpImuPreintegratedFromLastKF = nullptr;
 
     // Queue of IMU measurements between frames
     std::list<IMU::Point> mlQueueImuData;

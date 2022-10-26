@@ -275,8 +275,7 @@ namespace ORB_SLAM3 {
             }
         }
         else{
-            cerr << "Error: " << cameraModel << " not known" << endl;
-            exit(-1);
+            LOGE("Camera model '%s' not known", cameraModel.c_str());
         }
     }
 
@@ -291,7 +290,6 @@ namespace ORB_SLAM3 {
             float fy = readParameter<float>(fSettings,"Camera2.fy",found);
             float cx = readParameter<float>(fSettings,"Camera2.cx",found);
             float cy = readParameter<float>(fSettings,"Camera2.cy",found);
-
 
             vCalibration = {fx, fy, cx, cy};
 
@@ -327,7 +325,6 @@ namespace ORB_SLAM3 {
             float k2 = readParameter<float>(fSettings,"Camera2.k3",found);
             float k3 = readParameter<float>(fSettings,"Camera2.k4",found);
 
-
             vCalibration = {fx,fy,cx,cy,k0,k1,k2,k3};
 
             calibration2_ = new KannalaBrandt8(vCalibration);
@@ -347,7 +344,7 @@ namespace ORB_SLAM3 {
         }
         else{
             cv::Mat cvTlr = readParameter<cv::Mat>(fSettings,"Stereo.T_c1_c2",found);
-            cvTlr_ = cvTlr;
+            cvTlr_ = cvTlr.rowRange(0, 3).colRange(0, 4).clone();
             Tlr_ = Converter::toSophus(cvTlr);
 
             //TODO: also search for Trl and invert if necessary
@@ -357,8 +354,6 @@ namespace ORB_SLAM3 {
         }
 
         thDepth_ = readParameter<float>(fSettings,"Stereo.ThDepth",found);
-
-
     }
 
     void Settings::readImageInfo(cv::FileStorage &fSettings) {
@@ -428,7 +423,7 @@ namespace ORB_SLAM3 {
         imuFrequency_ = readParameter<float>(fSettings,"IMU.Frequency",found);
 
         cv::Mat cvTbc = readParameter<cv::Mat>(fSettings,"IMU.T_b_c1",found);
-        cvTbc_ = cvTbc;
+        cvTbc_ = cvTbc.clone();
         Tbc_ = Converter::toSophus(cvTbc);
 
         readParameter<int>(fSettings,"IMU.InsertKFsWhenLost",found,false);

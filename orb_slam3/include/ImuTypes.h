@@ -212,7 +212,7 @@ class Preintegrated
 
 public:
     Preintegrated(const Bias &b_, const Calib &calib);
-    Preintegrated(Preintegrated* pImuPre);
+    Preintegrated(const Preintegrated* pImuPre);
     Preintegrated() {}
     ~Preintegrated() {}
     void CopyFrom(Preintegrated* pImuPre);

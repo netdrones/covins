@@ -67,7 +67,7 @@ public:
     void ComputeBoW();
 
     // Set the camera pose. (Imu pose is not modified!)
-    void SetPose(cv::Mat Tcw);
+    void SetPose(const cv::Mat& Tcw);
     void GetPose(cv::Mat &Tcw);
 
     // Set IMU velocity
@@ -186,7 +186,12 @@ public:
     // Keypoints are assigned to cells in a grid to reduce matching complexity when projecting MapPoints.
     static float mfGridElementWidthInv;
     static float mfGridElementHeightInv;
-    std::vector<std::size_t> mGrid[FRAME_GRID_COLS][FRAME_GRID_ROWS] {};
+
+    // XXX: This big memory allocation in stack memory causes unexpected behavior in Android.
+    // Instead of allocating object in stack memory, use a vector of vector that employs heap
+    // allocation internally.
+//    std::vector<std::size_t> mGrid[FRAME_GRID_COLS][FRAME_GRID_ROWS];
+    std::vector<std::vector<std::vector<std::size_t> > > mGrid;
 
 
     // Camera pose.

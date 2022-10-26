@@ -18,6 +18,7 @@
 
 #include "ImuTypes.h"
 #include<iostream>
+#include "Logger.h"
 
 namespace ORB_SLAM3
 {
@@ -184,23 +185,22 @@ Preintegrated::Preintegrated(const Bias &b_, const Calib &calib)
 }
 
 // Copy constructor
-Preintegrated::Preintegrated(Preintegrated* pImuPre): dT(pImuPre->dT), C(pImuPre->C.clone()), Info(pImuPre->Info.clone()),
+Preintegrated::Preintegrated(const Preintegrated* pImuPre): dT(pImuPre->dT), C(pImuPre->C.clone()), Info(pImuPre->Info.clone()),
     Nga(pImuPre->Nga.clone()), NgaWalk(pImuPre->NgaWalk.clone()), b(pImuPre->b), dR(pImuPre->dR.clone()), dV(pImuPre->dV.clone()),
     dP(pImuPre->dP.clone()), JRg(pImuPre->JRg.clone()), JVg(pImuPre->JVg.clone()), JVa(pImuPre->JVa.clone()), JPg(pImuPre->JPg.clone()),
     JPa(pImuPre->JPa.clone()), avgA(pImuPre->avgA.clone()), avgW(pImuPre->avgW.clone()), bu(pImuPre->bu), db(pImuPre->db.clone()), mvMeasurements(pImuPre->mvMeasurements)
 {
-
 }
 
 void Preintegrated::CopyFrom(Preintegrated* pImuPre)
 {
-    std::cout << "Preintegrated: start clone" << std::endl;
+    LOGD("Preintegrated: start clone");
     dT = pImuPre->dT;
     C = pImuPre->C.clone();
     Info = pImuPre->Info.clone();
     Nga = pImuPre->Nga.clone();
     NgaWalk = pImuPre->NgaWalk.clone();
-    std::cout << "Preintegrated: first clone" << std::endl;
+    LOGD("Preintegrated: first clone");
     b.CopyFrom(pImuPre->b);
     dR = pImuPre->dR.clone();
     dV = pImuPre->dV.clone();
@@ -212,12 +212,12 @@ void Preintegrated::CopyFrom(Preintegrated* pImuPre)
     JPa = pImuPre->JPa.clone();
     avgA = pImuPre->avgA.clone();
     avgW = pImuPre->avgW.clone();
-    std::cout << "Preintegrated: second clone" << std::endl;
+    LOGD("Preintegrated: second clone");
     bu.CopyFrom(pImuPre->bu);
     db = pImuPre->db.clone();
-    std::cout << "Preintegrated: third clone" << std::endl;
+    LOGD("Preintegrated: third clone");
     mvMeasurements = pImuPre->mvMeasurements;
-    std::cout << "Preintegrated: end clone" << std::endl;
+    LOGD("Preintegrated: end clone");
 }
 
 

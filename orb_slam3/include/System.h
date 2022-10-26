@@ -73,13 +73,13 @@ public:
                     LOGI("%s", str.c_str());
                     break;
                 case VERBOSITY_VERBOSE:
-                    LOGV("%s", str.c_str());
+                    LOGD("%s", str.c_str());
                     break;
                 case VERBOSITY_VERY_VERBOSE:
-                    LOGV("%s", str.c_str());
+                    LOGD("%s", str.c_str());
                     break;
                 case VERBOSITY_DEBUG:
-                    LOGD("%s", str.c_str());
+                    LOGV("%s", str.c_str());
                     break;
                 default:
                     break;

@@ -297,8 +297,12 @@ public:
     //computed during ComputeStereoFishEyeMatches
     std::vector<cv::Mat> mvStereo3Dpoints;
 
+    // XXX: This big memory allocation in stack memory causes unexpected behavior in Android.
+    // Instead of allocating object in stack memory, use a vector of vector that employs heap
+    // allocation internally.
     //Grid for the right image
-    std::vector<std::size_t> mGridRight[FRAME_GRID_COLS][FRAME_GRID_ROWS];
+//    std::vector<std::size_t> mGridRight[FRAME_GRID_COLS][FRAME_GRID_ROWS];
+    std::vector<std::vector<std::vector<std::size_t> > > mGridRight;
 
     cv::Mat mTlr, mRlr, mtlr, mTrl;
     cv::Matx34f mTrlx, mTlrx;

@@ -47,8 +47,10 @@ cv::BFMatcher Frame::BFmatcher = cv::BFMatcher(cv::NORM_HAMMING);
 Frame::Frame(): mpcpi(nullptr), mpImuPreintegrated(nullptr), mpPrevFrame(nullptr), mpImuPreintegratedFrame(nullptr), mpReferenceKF(static_cast<KeyFrame*>(nullptr)), mbImuPreintegrated(false)
 {
     mGrid.resize(FRAME_GRID_COLS);
+    mGridRight.resize(FRAME_GRID_COLS);
     for(int i=0;i<FRAME_GRID_COLS;i++) {
         mGrid[i].resize(FRAME_GRID_ROWS);
+        mGridRight[i].resize(FRAME_GRID_ROWS);
     }
 
 #ifdef REGISTER_TIMES
@@ -88,7 +90,7 @@ Frame::Frame(const Frame &frame)
         mGrid[i].resize(FRAME_GRID_ROWS);
         for(int j=0; j<FRAME_GRID_ROWS; j++){
             mGrid[i][j]=frame.mGrid[i][j];
-            if(frame.Nleft > 0){
+            if(frame.Nleft > 0 && mGridRight.size() > i && mGrid[i].size() > j) {
                 mGridRight[i][j] = frame.mGridRight[i][j];
             }
         }
@@ -116,8 +118,10 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
      mpCamera(pCamera) ,mpCamera2(nullptr)
 {
     mGrid.resize(FRAME_GRID_COLS);
+    mGridRight.resize(FRAME_GRID_COLS);
     for(int i=0;i<FRAME_GRID_COLS;i++) {
         mGrid[i].resize(FRAME_GRID_ROWS);
+        mGridRight[i].resize(FRAME_GRID_ROWS);
     }
 
     // Frame ID
@@ -225,8 +229,10 @@ Frame::Frame(const cv::Mat &imGray, const cv::Mat &imDepth, const double &timeSt
      mpCamera(pCamera),mpCamera2(nullptr)
 {
     mGrid.resize(FRAME_GRID_COLS);
+    mGridRight.resize(FRAME_GRID_COLS);
     for(int i=0;i<FRAME_GRID_COLS;i++) {
         mGrid[i].resize(FRAME_GRID_ROWS);
+        mGridRight[i].resize(FRAME_GRID_ROWS);
     }
 
     // Frame ID
@@ -313,8 +319,10 @@ Frame::Frame(const cv::Mat &imGray, const double &timeStamp, ORBextractor* extra
      mpCamera2(nullptr)
 {
     mGrid.resize(FRAME_GRID_COLS);
+    mGridRight.resize(FRAME_GRID_COLS);
     for(int i=0;i<FRAME_GRID_COLS;i++) {
         mGrid[i].resize(FRAME_GRID_ROWS);
+        mGridRight[i].resize(FRAME_GRID_ROWS);
     }
 
     // Frame ID
@@ -1053,8 +1061,10 @@ Frame::Frame(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timeSt
          mImuCalib(ImuCalib), mpImuPreintegrated(nullptr), mpPrevFrame(pPrevF),mpImuPreintegratedFrame(nullptr), mpReferenceKF(static_cast<KeyFrame*>(nullptr)), mbImuPreintegrated(false), mpCamera(pCamera), mpCamera2(pCamera2), mTlr(Tlr)
 {
     mGrid.resize(FRAME_GRID_COLS);
+    mGridRight.resize(FRAME_GRID_COLS);
     for(int i=0;i<FRAME_GRID_COLS;i++) {
         mGrid[i].resize(FRAME_GRID_ROWS);
+        mGridRight[i].resize(FRAME_GRID_ROWS);
     }
 
     imgLeft = imLeft.clone();

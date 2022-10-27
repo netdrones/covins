@@ -27,6 +27,9 @@
 
 // ORB-SLAM3
 #include "Atlas.h"
+#include "Logger.h"
+
+#ifdef COVINS_MOD
 
 namespace ORB_SLAM3 {
 
@@ -139,3 +142,5 @@ auto Communicator::Run()->void {
 }
 
 } //end ns
+
+#endif // COVINS_MOD

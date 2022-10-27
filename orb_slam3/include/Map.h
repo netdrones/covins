@@ -24,7 +24,9 @@
 #include "KeyFrame.h"
 
 #include <set>
+#if defined(WITH_VIEWER) && WITH_VIEWER
 #include <pangolin/pangolin.h>
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 #include <mutex>
 
 #include <boost/serialization/base_object.hpp>
@@ -145,9 +147,10 @@ protected:
     // Index related to a big change in the map (loop closure, global BA)
     int mnBigChangeIdx;
 
-
+#if defined(WITH_VIEWER) && WITH_VIEWER
     // View of the map in aerial sight (for the AtlasViewer)
     GLubyte* mThumbnail;
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
     bool mIsInUse;
     bool mHasTumbnail;

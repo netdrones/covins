@@ -67,7 +67,7 @@ public:
     void ComputeBoW();
 
     // Set the camera pose. (Imu pose is not modified!)
-    void SetPose(cv::Mat Tcw);
+    void SetPose(const cv::Mat& Tcw);
     void GetPose(cv::Mat &Tcw);
 
     // Set IMU velocity
@@ -128,10 +128,10 @@ public:
     cv::Mat mOw;
 public:
     // Vocabulary used for relocalization.
-    ORBVocabulary* mpORBvocabulary;
+    ORBVocabulary* mpORBvocabulary = nullptr;
 
     // Feature extractor. The right is used only in the stereo case.
-    ORBextractor* mpORBextractorLeft, *mpORBextractorRight;
+    ORBextractor* mpORBextractorLeft = nullptr, *mpORBextractorRight = nullptr;
 
     // Frame timestamp.
     double mTimeStamp;
@@ -186,7 +186,12 @@ public:
     // Keypoints are assigned to cells in a grid to reduce matching complexity when projecting MapPoints.
     static float mfGridElementWidthInv;
     static float mfGridElementHeightInv;
-    std::vector<std::size_t> mGrid[FRAME_GRID_COLS][FRAME_GRID_ROWS];
+
+    // XXX: This big memory allocation in stack memory causes unexpected behavior in Android.
+    // Instead of allocating object in stack memory, use a vector of vector that employs heap
+    // allocation internally.
+//    std::vector<std::size_t> mGrid[FRAME_GRID_COLS][FRAME_GRID_ROWS];
+    std::vector<std::vector<std::vector<std::size_t> > > mGrid;
 
 
     // Camera pose.
@@ -205,19 +210,19 @@ public:
     IMU::Calib mImuCalib;
 
     // Imu preintegration from last keyframe
-    IMU::Preintegrated* mpImuPreintegrated;
-    KeyFrame* mpLastKeyFrame;
+    IMU::Preintegrated* mpImuPreintegrated = nullptr;
+    KeyFrame* mpLastKeyFrame = nullptr;
 
     // Pointer to previous frame
-    Frame* mpPrevFrame;
-    IMU::Preintegrated* mpImuPreintegratedFrame;
+    Frame* mpPrevFrame = nullptr;
+    IMU::Preintegrated* mpImuPreintegratedFrame = nullptr;
 
     // Current and Next Frame id.
     static long unsigned int nNextId;
     long unsigned int mnId;
 
     // Reference Keyframe.
-    KeyFrame* mpReferenceKF;
+    KeyFrame* mpReferenceKF = nullptr;
 
     // Scale pyramid info.
     int mnScaleLevels;
@@ -292,8 +297,12 @@ public:
     //computed during ComputeStereoFishEyeMatches
     std::vector<cv::Mat> mvStereo3Dpoints;
 
+    // XXX: This big memory allocation in stack memory causes unexpected behavior in Android.
+    // Instead of allocating object in stack memory, use a vector of vector that employs heap
+    // allocation internally.
     //Grid for the right image
-    std::vector<std::size_t> mGridRight[FRAME_GRID_COLS][FRAME_GRID_ROWS];
+//    std::vector<std::size_t> mGridRight[FRAME_GRID_COLS][FRAME_GRID_ROWS];
+    std::vector<std::vector<std::vector<std::size_t> > > mGridRight;
 
     cv::Mat mTlr, mRlr, mtlr, mTrl;
     cv::Matx34f mTrlx, mTlrx;

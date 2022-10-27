@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-#include <eigen3/Eigen/Core>
+#include <Eigen/Core>
 #include <opencv2/opencv.hpp>
 
 #include "../typedefs_base.hpp"

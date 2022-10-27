@@ -19,6 +19,7 @@
 #include "KannalaBrandt8.h"
 
 #include <boost/serialization/export.hpp>
+#include <opencv2/calib3d.hpp>
 
 namespace ORB_SLAM3 {
 

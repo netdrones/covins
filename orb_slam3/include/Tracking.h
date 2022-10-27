@@ -37,6 +37,7 @@
 #include "MapDrawer.h"
 #include "System.h"
 #include "ImuTypes.h"
+#include "Settings.h"
 
 #include "GeometricCamera.h"
 
@@ -57,10 +58,17 @@ class Tracking
 {  
 
 public:
-    Tracking(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Atlas* pAtlas,
-             KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor, const string &_nameSeq=std::string());
+    Tracking(System* pSys, ORBVocabulary* pVoc,
+#if defined(WITH_VIEWER) && WITH_VIEWER
+             FrameDrawer* pFrameDrawer,
+             MapDrawer* pMapDrawer,
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
+             Atlas* pAtlas,
+             KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor,
+             Settings* settings,
+             const string &_nameSeq=std::string());
 
-    ~Tracking();
+    ~Tracking() = default;
 
     // Parse the config file
     bool ParseCamParamFile(cv::FileStorage &fSettings);
@@ -226,7 +234,7 @@ protected:
     bool mbMapUpdated;
 
     // Imu preintegration from last frame
-    IMU::Preintegrated *mpImuPreintegratedFromLastKF;
+    IMU::Preintegrated *mpImuPreintegratedFromLastKF = nullptr;
 
     // Queue of IMU measurements between frames
     std::list<IMU::Point> mlQueueImuData;
@@ -270,20 +278,29 @@ protected:
     
     // System
     System* mpSystem;
-    
+
+
+#if defined(WITH_VIEWER) && WITH_VIEWER
     //Drawers
     Viewer* mpViewer;
     FrameDrawer* mpFrameDrawer;
     MapDrawer* mpMapDrawer;
     bool bStepByStep;
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
     //Atlas
     Atlas* mpAtlas;
 
     //Calibration matrix
     cv::Mat mK;
+    Eigen::Matrix3f mK_;
     cv::Mat mDistCoef;
     float mbf;
+    float mImageScale;
+
+    float mImuFreq;
+    double mImuPer;
+    bool mInsertKFsLost;
 
     //New KeyFrame rules (according to fps)
     int mMinFrames;
@@ -343,6 +360,8 @@ protected:
     int initID, lastID;
 
     cv::Mat mTlr;
+
+    void newParameterLoader(Settings* settings);
 
 public:
     cv::Mat mImRight;

@@ -214,4 +214,18 @@ std::vector<float> Converter::toEuler(const cv::Mat &R)
     return v_euler;
 }
 
+    Sophus::SE3<float> Converter::toSophus(const cv::Mat &T) {
+        Eigen::Matrix<double,3,3> eigMat = toMatrix3d(T.rowRange(0,3).colRange(0,3));
+        Eigen::Quaternionf q(eigMat.cast<float>());
+
+        Eigen::Matrix<float,3,1> t = toVector3d(T.rowRange(0,3).col(3)).cast<float>();
+
+        return Sophus::SE3<float>(q,t);
+    }
+
+    Sophus::Sim3f Converter::toSophus(const g2o::Sim3& S) {
+        return Sophus::Sim3f(Sophus::RxSO3d((float)S.scale(), S.rotation().matrix()).cast<float>() ,
+                             S.translation().cast<float>());
+    }
+
 } //namespace ORB_SLAM

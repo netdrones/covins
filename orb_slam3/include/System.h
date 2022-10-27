@@ -35,9 +35,13 @@
 #include "LoopClosing.h"
 #include "KeyFrameDatabase.h"
 #include "ORBVocabulary.h"
+#if defined(WITH_VIEWER) && WITH_VIEWER
 #include "Viewer.h"
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 #include "ImuTypes.h"
 #include "Config.h"
+#include "Settings.h"
+#include "Logger.h"
 
 // COVINS
 #include "comm/communicator.hpp"
@@ -60,10 +64,30 @@ public:
     static eLevel th;
 
 public:
-    static void PrintMess(std::string str, eLevel lev)
+    static void PrintMess(const std::string& str, eLevel lev)
     {
-        if(lev <= th)
+        if(lev <= th) {
+#ifdef __ANDROID__
+            switch (lev) {
+                case VERBOSITY_NORMAL:
+                    LOGI("%s", str.c_str());
+                    break;
+                case VERBOSITY_VERBOSE:
+                    LOGD("%s", str.c_str());
+                    break;
+                case VERBOSITY_VERY_VERBOSE:
+                    LOGD("%s", str.c_str());
+                    break;
+                case VERBOSITY_DEBUG:
+                    LOGV("%s", str.c_str());
+                    break;
+                default:
+                    break;
+            }
+#else
             cout << str << endl;
+#endif // __ANDROID__
+        }
     }
 
     static void SetTh(eLevel _th)
@@ -88,7 +112,8 @@ public:
         STEREO=1,
         RGBD=2,
         IMU_MONOCULAR=3,
-        IMU_STEREO=4
+        IMU_STEREO=4,
+        IMU_RGBD=5,
     };
 
     // File type
@@ -100,7 +125,13 @@ public:
 public:
 
     // Initialize the SLAM system. It launches the Local Mapping, Loop Closing and Viewer threads.
-    System(const string &strVocFile, const string &strSettingsFile, const eSensor sensor, const bool bUseViewer = true, const int initFr = 0, const string &strSequence = std::string(), const string &strLoadingFile = std::string());
+    System(const string &strVocFile,
+           const string &strSettingsFile,
+           eSensor sensor,
+           bool bUseViewer = true,
+           int initFr = 0,
+           const string &strSequence = std::string(),
+           const string &strLoadingFile = std::string());
 
     // Proccess the given stereo frame. Images must be synchronized and rectified.
     // Input images: RGB (CV_8UC3) or grayscale (CV_8U). RGB is converted to grayscale.
@@ -212,11 +243,13 @@ private:
     covins::TypeDefs::ThreadPtr thread_comm_;
 #endif
 
+#if defined(WITH_VIEWER) && WITH_VIEWER
     // The viewer draws the map and the current camera pose. It uses Pangolin.
     Viewer* mpViewer;
 
     FrameDrawer* mpFrameDrawer;
     MapDrawer* mpMapDrawer;
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
     // System threads: Local Mapping, Loop Closing, Viewer.
     // The Tracking thread "lives" in the main execution thread that creates the System object.
@@ -239,6 +272,8 @@ private:
     std::vector<MapPoint*> mTrackedMapPoints;
     std::vector<cv::KeyPoint> mTrackedKeyPointsUn;
     std::mutex mMutexState;
+
+    Settings* settings_;
 };
 
 }// namespace ORB_SLAM

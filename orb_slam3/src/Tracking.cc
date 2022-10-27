@@ -28,6 +28,7 @@
 #include "Initializer.h"
 #include "G2oTypes.h"
 #include "Optimizer.h"
+#include "Logger.h"
 
 #include <iostream>
 
@@ -46,58 +47,64 @@ namespace ORB_SLAM3
 {
 
 
-Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Atlas *pAtlas, KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor, const string &_nameSeq):
+Tracking::Tracking(System *pSys, ORBVocabulary* pVoc,
+#if defined(WITH_VIEWER) && WITH_VIEWER
+                   FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer,
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
+                   Atlas *pAtlas, KeyFrameDatabase* pKFDB, const string &strSettingPath,
+                   const int sensor, Settings* settings, const string &_nameSeq):
     mState(NO_IMAGES_YET), mSensor(sensor), mTrackedFr(0), mbStep(false),
     mbOnlyTracking(false), mbMapUpdated(false), mbVO(false), mpORBVocabulary(pVoc), mpKeyFrameDB(pKFDB),
-    mpInitializer(static_cast<Initializer*>(NULL)), mpSystem(pSys), mpViewer(NULL),
-    mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpAtlas(pAtlas), mnLastRelocFrameId(0), time_recently_lost(5.0), time_recently_lost_visual(2.0),
+    mpInitializer(nullptr), mpSystem(pSys),
+#if defined(WITH_VIEWER) && WITH_VIEWER
+    mpViewer(nullptr),
+    mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer),
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
+    mpAtlas(pAtlas), mnLastRelocFrameId(0), time_recently_lost(5.0), time_recently_lost_visual(2.0),
     mnInitialFrameId(0), mbCreatedMap(false), mnFirstFrameId(0), mpCamera2(nullptr)
 {
     // Load camera parameters from settings file
-    cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
+    if (settings) {
+        newParameterLoader(settings);
+    } else {
+        // Load camera parameters from settings file
+        cv::FileStorage fSettings(strSettingPath, cv::FileStorage::READ);
 
-    bool b_parse_cam = ParseCamParamFile(fSettings);
-    if(!b_parse_cam)
-    {
-        std::cout << "*Error with the camera parameters in the config file*" << std::endl;
-    }
-
-    // Load ORB parameters
-    bool b_parse_orb = ParseORBParamFile(fSettings);
-    if(!b_parse_orb)
-    {
-        std::cout << "*Error with the ORB parameters in the config file*" << std::endl;
-    }
-
-    initID = 0; lastID = 0;
-
-    // Load IMU parameters
-    bool b_parse_imu = true;
-    if(sensor==System::IMU_MONOCULAR || sensor==System::IMU_STEREO)
-    {
-        b_parse_imu = ParseIMUParamFile(fSettings);
-        if(!b_parse_imu)
+        bool b_parse_cam = ParseCamParamFile(fSettings);
+        if(!b_parse_cam)
         {
-            std::cout << "*Error with the IMU parameters in the config file*" << std::endl;
+            LOGE("Error with the camera parameters in the config file");
         }
 
-        mnFramesToResetIMU = mMaxFrames;
-    }
-
-    mbInitWith3KFs = false;
-
-    mnNumDataset = 0;
-
-    if(!b_parse_cam || !b_parse_orb || !b_parse_imu)
-    {
-        std::cerr << "**ERROR in the config file, the format is not correct**" << std::endl;
-        try
+        // Load ORB parameters
+        bool b_parse_orb = ParseORBParamFile(fSettings);
+        if(!b_parse_orb)
         {
-            throw -1;
+            LOGE("Error with the ORB parameters in the config file");
         }
-        catch(exception &e)
-        {
 
+        initID = 0; lastID = 0;
+
+        // Load IMU parameters
+        bool b_parse_imu = true;
+        if(sensor==System::IMU_MONOCULAR || sensor==System::IMU_STEREO)
+        {
+            b_parse_imu = ParseIMUParamFile(fSettings);
+            if(!b_parse_imu)
+            {
+                LOGE("Error with the IMU parameters in the config file");
+            }
+
+            mnFramesToResetIMU = mMaxFrames;
+        }
+
+        mbInitWith3KFs = false;
+
+        mnNumDataset = 0;
+
+        if(!b_parse_cam || !b_parse_orb || !b_parse_imu)
+        {
+            LOGE("ERROR in the config file, the format is not correct");
         }
     }
 
@@ -491,15 +498,96 @@ void Tracking::PrintTimeStats()
 
 #endif
 
-Tracking::~Tracking()
-{
+void Tracking::newParameterLoader(Settings* settings) {
+    mpCamera = settings->camera1();
+    mpAtlas->AddCamera(mpCamera);
 
+    if(settings->needToUndistort()){
+        mDistCoef = settings->camera1DistortionCoef();
+    }
+    else{
+        mDistCoef = cv::Mat::zeros(4,1,CV_32F);
+    }
+
+    //TODO: missing image scaling and rectification
+    mImageScale = 1.0f;
+
+    mK = cv::Mat::eye(3,3,CV_32F);
+    mK.at<float>(0,0) = mpCamera->getParameter(0);
+    mK.at<float>(1,1) = mpCamera->getParameter(1);
+    mK.at<float>(0,2) = mpCamera->getParameter(2);
+    mK.at<float>(1,2) = mpCamera->getParameter(3);
+
+    mK_.setIdentity();
+    mK_(0,0) = mpCamera->getParameter(0);
+    mK_(1,1) = mpCamera->getParameter(1);
+    mK_(0,2) = mpCamera->getParameter(2);
+    mK_(1,2) = mpCamera->getParameter(3);
+
+    if((mSensor==System::STEREO || mSensor==System::IMU_STEREO || mSensor==System::IMU_RGBD) &&
+       settings->cameraType() == Settings::KannalaBrandt){
+        mpCamera2 = settings->camera2();
+        mpAtlas->AddCamera(mpCamera2);
+        mTlr = settings->cvTlr();
+
+#if defined(WITH_VIEWER) && WITH_VIEWER
+        mpFrameDrawer->both = true;
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
+    }
+
+    if(mSensor==System::STEREO || mSensor==System::RGBD || mSensor==System::IMU_STEREO || mSensor==System::IMU_RGBD ){
+        mbf = settings->bf();
+        mThDepth = settings->b() * settings->thDepth();
+    }
+
+    if(mSensor==System::RGBD || mSensor==System::IMU_RGBD){
+        mDepthMapFactor = settings->depthMapFactor();
+        if(fabs(mDepthMapFactor)<1e-5)
+            mDepthMapFactor=1;
+        else
+            mDepthMapFactor = 1.0f/mDepthMapFactor;
+    }
+
+    mMinFrames = 0;
+    mMaxFrames = static_cast<int>(settings->fps());
+    mbRGB = settings->rgb();
+
+    //ORB parameters
+    auto nFeatures = settings->nFeatures();
+    auto nLevels = settings->nLevels();
+    auto fIniThFAST = settings->initThFAST();
+    auto fMinThFAST = settings->minThFAST();
+    auto fScaleFactor = settings->scaleFactor();
+
+    mpORBextractorLeft = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
+
+    if(mSensor==System::STEREO || mSensor==System::IMU_STEREO)
+        mpORBextractorRight = new ORBextractor(nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
+
+    if(mSensor==System::MONOCULAR || mSensor==System::IMU_MONOCULAR)
+        mpIniORBextractor = new ORBextractor(5*nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
+
+    //IMU parameters
+    auto Tbc = settings->cvTbc();
+    mInsertKFsLost = settings->insertKFsWhenLost();
+    mImuFreq = settings->imuFrequency();
+    mImuPer = 0.001; //1.0 / (double) mImuFreq;     //TODO: ESTO ESTA BIEN?
+    float Ng = settings->noiseGyro();
+    float Na = settings->noiseAcc();
+    float Ngw = settings->gyroWalk();
+    float Naw = settings->accWalk();
+
+    const float sf = sqrt(mImuFreq);
+    mpImuCalib = new IMU::Calib(Tbc,Ng*sf,Na*sf,Ngw/sf,Naw/sf);
+
+
+    mpImuPreintegratedFromLastKF = new IMU::Preintegrated(IMU::Bias(),*mpImuCalib);
 }
 
 bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
 {
     mDistCoef = cv::Mat::zeros(4,1,CV_32F);
-    cout << endl << "Camera Parameters: " << endl;
+    LOGD("Camera Parameters: ");
     bool b_miss_params = false;
 
     string sCameraName = fSettings["Camera.type"];
@@ -511,44 +599,44 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         cv::FileNode node = fSettings["Camera.fx"];
         if(!node.empty() && node.isReal())
         {
-            fx = node.real();
+            fx = static_cast<float>(node.real());
         }
         else
         {
-            std::cerr << "*Camera.fx parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.fx parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
         node = fSettings["Camera.fy"];
         if(!node.empty() && node.isReal())
         {
-            fy = node.real();
+            fy = static_cast<float>(node.real());
         }
         else
         {
-            std::cerr << "*Camera.fy parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.fy parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
         node = fSettings["Camera.cx"];
         if(!node.empty() && node.isReal())
         {
-            cx = node.real();
+            cx = static_cast<float>(node.real());
         }
         else
         {
-            std::cerr << "*Camera.cx parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.cx parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
         node = fSettings["Camera.cy"];
         if(!node.empty() && node.isReal())
         {
-            cy = node.real();
+            cy = static_cast<float>(node.real());
         }
         else
         {
-            std::cerr << "*Camera.cy parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.cy parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -556,11 +644,11 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         node = fSettings["Camera.k1"];
         if(!node.empty() && node.isReal())
         {
-            mDistCoef.at<float>(0) = node.real();
+            mDistCoef.at<float>(0) = static_cast<float>(node.real());
         }
         else
         {
-            std::cerr << "*Camera.k1 parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.k1 parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -571,7 +659,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.k2 parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.k2 parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -582,7 +670,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.p1 parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.p1 parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -593,7 +681,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.p2 parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.p2 parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -615,7 +703,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
 
         mpAtlas->AddCamera(mpCamera);
 
-
+#ifdef __ANDROID__
         std::cout << "- Camera: Pinhole" << std::endl;
         std::cout << "- fx: " << fx << std::endl;
         std::cout << "- fy: " << fy << std::endl;
@@ -630,6 +718,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
 
         if(mDistCoef.rows==5)
             std::cout << "- k3: " << mDistCoef.at<float>(4) << std::endl;
+#endif // __ANDROID__
 
         mK = cv::Mat::eye(3,3,CV_32F);
         mK.at<float>(0,0) = fx;
@@ -647,32 +736,32 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         cv::FileNode node = fSettings["Camera.fx"];
         if(!node.empty() && node.isReal())
         {
-            fx = node.real();
+            fx = static_cast<float>(node.real());
         }
         else
         {
-            std::cerr << "*Camera.fx parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.fx parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
         node = fSettings["Camera.fy"];
         if(!node.empty() && node.isReal())
         {
-            fy = node.real();
+            fy = static_cast<float>(node.real());
         }
         else
         {
-            std::cerr << "*Camera.fy parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.fy parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
         node = fSettings["Camera.cx"];
         if(!node.empty() && node.isReal())
         {
-            cx = node.real();
+            cx = static_cast<float>(node.real());
         }
         else
         {
-            std::cerr << "*Camera.cx parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.cx parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -683,7 +772,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.cy parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.cy parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -695,7 +784,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.k1 parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.k1 parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
         node = fSettings["Camera.k2"];
@@ -705,7 +794,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.k2 parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.k2 parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -716,7 +805,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.k3 parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.k3 parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -727,7 +816,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*Camera.k4 parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.k4 parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -736,6 +825,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             vector<float> vCamCalib{fx,fy,cx,cy,k1,k2,k3,k4};
             mpCamera = new KannalaBrandt8(vCamCalib);
 
+#ifndef __ANDROID__
             std::cout << "- Camera: Fisheye" << std::endl;
             std::cout << "- fx: " << fx << std::endl;
             std::cout << "- fy: " << fy << std::endl;
@@ -745,6 +835,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             std::cout << "- k2: " << k2 << std::endl;
             std::cout << "- k3: " << k3 << std::endl;
             std::cout << "- k4: " << k4 << std::endl;
+#endif // __ANDROID__
 
             mK = cv::Mat::eye(3,3,CV_32F);
             mK.at<float>(0,0) = fx;
@@ -763,7 +854,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cerr << "*Camera2.fx parameter doesn't exist or is not a real number*" << std::endl;
+                LOGE("Camera2.fx parameter doesn't exist or is not a real number");
                 b_miss_params = true;
             }
             node = fSettings["Camera2.fy"];
@@ -773,7 +864,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cerr << "*Camera2.fy parameter doesn't exist or is not a real number*" << std::endl;
+                LOGE("Camera2.fy parameter doesn't exist or is not a real number");
                 b_miss_params = true;
             }
 
@@ -784,7 +875,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cerr << "*Camera2.cx parameter doesn't exist or is not a real number*" << std::endl;
+                LOGE("Camera2.cx parameter doesn't exist or is not a real number");
                 b_miss_params = true;
             }
 
@@ -795,7 +886,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cerr << "*Camera2.cy parameter doesn't exist or is not a real number*" << std::endl;
+                LOGE("Camera2.cy parameter doesn't exist or is not a real number");
                 b_miss_params = true;
             }
 
@@ -807,7 +898,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cerr << "*Camera2.k1 parameter doesn't exist or is not a real number*" << std::endl;
+                LOGE("Camera2.k1 parameter doesn't exist or is not a real number");
                 b_miss_params = true;
             }
             node = fSettings["Camera2.k2"];
@@ -817,7 +908,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cerr << "*Camera2.k2 parameter doesn't exist or is not a real number*" << std::endl;
+                LOGE("Camera2.k2 parameter doesn't exist or is not a real number");
                 b_miss_params = true;
             }
 
@@ -828,7 +919,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cerr << "*Camera2.k3 parameter doesn't exist or is not a real number*" << std::endl;
+                LOGE("Camera2.k3 parameter doesn't exist or is not a real number");
                 b_miss_params = true;
             }
 
@@ -839,7 +930,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cerr << "*Camera2.k4 parameter doesn't exist or is not a real number*" << std::endl;
+                LOGE("Camera2.k4 parameter doesn't exist or is not a real number");
                 b_miss_params = true;
             }
 
@@ -857,7 +948,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cout << "WARNING: Camera.lappingBegin not correctly defined" << std::endl;
+                LOGW("WARNING: Camera.lappingBegin not correctly defined");
             }
             node = fSettings["Camera.lappingEnd"];
             if(!node.empty() && node.isInt())
@@ -866,7 +957,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cout << "WARNING: Camera.lappingEnd not correctly defined" << std::endl;
+                LOGW("WARNING: Camera.lappingEnd not correctly defined");
             }
             node = fSettings["Camera2.lappingBegin"];
             if(!node.empty() && node.isInt())
@@ -875,7 +966,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cout << "WARNING: Camera2.lappingBegin not correctly defined" << std::endl;
+                LOGW("WARNING: Camera2.lappingBegin not correctly defined");
             }
             node = fSettings["Camera2.lappingEnd"];
             if(!node.empty() && node.isInt())
@@ -884,7 +975,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
             }
             else
             {
-                std::cout << "WARNING: Camera2.lappingEnd not correctly defined" << std::endl;
+                LOGW("WARNING: Camera2.lappingEnd not correctly defined");
             }
 
             node = fSettings["Tlr"];
@@ -893,29 +984,32 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
                 mTlr = node.mat();
                 if(mTlr.rows != 3 || mTlr.cols != 4)
                 {
-                    std::cerr << "*Tlr matrix have to be a 3x4 transformation matrix*" << std::endl;
+                    LOGE("Tlr matrix have to be a 3x4 transformation matrix");
                     b_miss_params = true;
                 }
             }
             else
             {
-                std::cerr << "*Tlr matrix doesn't exist*" << std::endl;
+                LOGE("Tlr matrix doesn't exist");
                 b_miss_params = true;
             }
 
             if(!b_miss_params)
             {
-                static_cast<KannalaBrandt8*>(mpCamera)->mvLappingArea[0] = leftLappingBegin;
-                static_cast<KannalaBrandt8*>(mpCamera)->mvLappingArea[1] = leftLappingEnd;
+                dynamic_cast<KannalaBrandt8*>(mpCamera)->mvLappingArea[0] = leftLappingBegin;
+                dynamic_cast<KannalaBrandt8*>(mpCamera)->mvLappingArea[1] = leftLappingEnd;
 
+#if defined(WITH_VIEWER) && WITH_VIEWER
                 mpFrameDrawer->both = true;
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
                 vector<float> vCamCalib2{fx,fy,cx,cy,k1,k2,k3,k4};
                 mpCamera2 = new KannalaBrandt8(vCamCalib2);
 
-                static_cast<KannalaBrandt8*>(mpCamera2)->mvLappingArea[0] = rightLappingBegin;
-                static_cast<KannalaBrandt8*>(mpCamera2)->mvLappingArea[1] = rightLappingEnd;
+                dynamic_cast<KannalaBrandt8*>(mpCamera2)->mvLappingArea[0] = rightLappingBegin;
+                dynamic_cast<KannalaBrandt8*>(mpCamera2)->mvLappingArea[1] = rightLappingEnd;
 
+#ifndef __ANDROID__
                 std::cout << "- Camera1 Lapping: " << leftLappingBegin << ", " << leftLappingEnd << std::endl;
 
                 std::cout << std::endl << "Camera2 Parameters:" << std::endl;
@@ -932,6 +1026,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
                 std::cout << "- mTlr: \n" << mTlr << std::endl;
 
                 std::cout << "- Camera2 Lapping: " << rightLappingBegin << ", " << rightLappingEnd << std::endl;
+#endif // __ANDROID__
             }
         }
 
@@ -945,8 +1040,8 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
     }
     else
     {
-        std::cerr << "*Not Supported Camera Sensor*" << std::endl;
-        std::cerr << "Check an example configuration file with the desired sensor" << std::endl;
+        LOGE("Not Supported Camera Sensor");
+        LOGE("Check an example configuration file with the desired sensor");
     }
 
     if(mSensor==System::STEREO || mSensor==System::IMU_STEREO)
@@ -954,11 +1049,11 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         cv::FileNode node = fSettings["Camera.bf"];
         if(!node.empty() && node.isReal())
         {
-            mbf = node.real();
+            mbf = static_cast<float>(node.real());
         }
         else
         {
-            std::cerr << "*Camera.bf parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("Camera.bf parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -991,11 +1086,11 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         {
             mThDepth = node.real();
             mThDepth = mbf*mThDepth/fx;
-            cout << endl << "Depth Threshold (Close/Far Points): " << mThDepth << endl;
+            LOGD("Depth Threshold (Close/Far Points): %f", mThDepth);
         }
         else
         {
-            std::cerr << "*ThDepth parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("ThDepth parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -1007,7 +1102,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         cv::FileNode node = fSettings["DepthMapFactor"];
         if(!node.empty() && node.isReal())
         {
-            mDepthMapFactor = node.real();
+            mDepthMapFactor = static_cast<float>(node.real());
             if(fabs(mDepthMapFactor)<1e-5)
                 mDepthMapFactor=1;
             else
@@ -1015,7 +1110,7 @@ bool Tracking::ParseCamParamFile(cv::FileStorage &fSettings)
         }
         else
         {
-            std::cerr << "*DepthMapFactor parameter doesn't exist or is not a real number*" << std::endl;
+            LOGE("DepthMapFactor parameter doesn't exist or is not a real number");
             b_miss_params = true;
         }
 
@@ -1042,7 +1137,7 @@ bool Tracking::ParseORBParamFile(cv::FileStorage &fSettings)
     }
     else
     {
-        std::cerr << "*ORBextractor.nFeatures parameter doesn't exist or is not an integer*" << std::endl;
+        LOGE("ORBextractor.nFeatures parameter doesn't exist or is not an integer");
         b_miss_params = true;
     }
 
@@ -1053,7 +1148,7 @@ bool Tracking::ParseORBParamFile(cv::FileStorage &fSettings)
     }
     else
     {
-        std::cerr << "*ORBextractor.scaleFactor parameter doesn't exist or is not a real number*" << std::endl;
+        LOGE("ORBextractor.scaleFactor parameter doesn't exist or is not a real number");
         b_miss_params = true;
     }
 
@@ -1064,7 +1159,7 @@ bool Tracking::ParseORBParamFile(cv::FileStorage &fSettings)
     }
     else
     {
-        std::cerr << "*ORBextractor.nLevels parameter doesn't exist or is not an integer*" << std::endl;
+        LOGE("ORBextractor.nLevels parameter doesn't exist or is not an integer");
         b_miss_params = true;
     }
 
@@ -1075,7 +1170,7 @@ bool Tracking::ParseORBParamFile(cv::FileStorage &fSettings)
     }
     else
     {
-        std::cerr << "*ORBextractor.iniThFAST parameter doesn't exist or is not an integer*" << std::endl;
+        LOGE("ORBextractor.iniThFAST parameter doesn't exist or is not an integer");
         b_miss_params = true;
     }
 
@@ -1086,7 +1181,7 @@ bool Tracking::ParseORBParamFile(cv::FileStorage &fSettings)
     }
     else
     {
-        std::cerr << "*ORBextractor.minThFAST parameter doesn't exist or is not an integer*" << std::endl;
+        LOGE("ORBextractor.minThFAST parameter doesn't exist or is not an integer");
         b_miss_params = true;
     }
 
@@ -1103,12 +1198,14 @@ bool Tracking::ParseORBParamFile(cv::FileStorage &fSettings)
     if(mSensor==System::MONOCULAR || mSensor==System::IMU_MONOCULAR)
         mpIniORBextractor = new ORBextractor(5*nFeatures,fScaleFactor,nLevels,fIniThFAST,fMinThFAST);
 
+#ifndef __ANDROID__
     cout << endl << "ORB Extractor Parameters: " << endl;
     cout << "- Number of Features: " << nFeatures << endl;
     cout << "- Scale Levels: " << nLevels << endl;
     cout << "- Scale Factor: " << fScaleFactor << endl;
     cout << "- Initial Fast Threshold: " << fIniThFAST << endl;
     cout << "- Minimum Fast Threshold: " << fMinThFAST << endl;
+#endif // __ANDROID__
 
     return true;
 }
@@ -1124,19 +1221,20 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings)
         Tbc = node.mat();
         if(Tbc.rows != 4 || Tbc.cols != 4)
         {
-            std::cerr << "*Tbc matrix have to be a 4x4 transformation matrix*" << std::endl;
+            LOGE("Tbc matrix have to be a 4x4 transformation matrix");
             b_miss_params = true;
         }
     }
     else
     {
-        std::cerr << "*Tbc matrix doesn't exist*" << std::endl;
+        LOGE("Tbc matrix doesn't exist");
         b_miss_params = true;
     }
 
+#ifndef __ANDROID__
     cout << endl;
-
     cout << "Left camera to Imu Transform (Tbc): " << endl << Tbc << endl;
+#endif // __ANDROID__
 
     float freq, Ng, Na, Ngw, Naw;
 
@@ -1147,51 +1245,51 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings)
     }
     else
     {
-        std::cerr << "*IMU.Frequency parameter doesn't exist or is not an integer*" << std::endl;
+        LOGE("IMU.Frequency parameter doesn't exist or is not an integer");
         b_miss_params = true;
     }
 
     node = fSettings["IMU.NoiseGyro"];
     if(!node.empty() && node.isReal())
     {
-        Ng = node.real();
+        Ng = static_cast<float>(node.real());
     }
     else
     {
-        std::cerr << "*IMU.NoiseGyro parameter doesn't exist or is not a real number*" << std::endl;
+        LOGE("IMU.NoiseGyro parameter doesn't exist or is not a real number");
         b_miss_params = true;
     }
 
     node = fSettings["IMU.NoiseAcc"];
     if(!node.empty() && node.isReal())
     {
-        Na = node.real();
+        Na = static_cast<float>(node.real());
     }
     else
     {
-        std::cerr << "*IMU.NoiseAcc parameter doesn't exist or is not a real number*" << std::endl;
+        LOGE("IMU.NoiseAcc parameter doesn't exist or is not a real number");
         b_miss_params = true;
     }
 
     node = fSettings["IMU.GyroWalk"];
     if(!node.empty() && node.isReal())
     {
-        Ngw = node.real();
+        Ngw = static_cast<float>(node.real());
     }
     else
     {
-        std::cerr << "*IMU.GyroWalk parameter doesn't exist or is not a real number*" << std::endl;
+        LOGE("IMU.GyroWalk parameter doesn't exist or is not a real number");
         b_miss_params = true;
     }
 
     node = fSettings["IMU.AccWalk"];
     if(!node.empty() && node.isReal())
     {
-        Naw = node.real();
+        Naw = static_cast<float>(node.real());
     }
     else
     {
-        std::cerr << "*IMU.AccWalk parameter doesn't exist or is not a real number*" << std::endl;
+        LOGE("IMU.AccWalk parameter doesn't exist or is not a real number");
         b_miss_params = true;
     }
 
@@ -1201,13 +1299,14 @@ bool Tracking::ParseIMUParamFile(cv::FileStorage &fSettings)
     }
 
     const float sf = sqrt(freq);
+#ifndef __ANDROID__
     cout << endl;
     cout << "IMU frequency: " << freq << " Hz" << endl;
     cout << "IMU gyro noise: " << Ng << " rad/s/sqrt(Hz)" << endl;
     cout << "IMU gyro walk: " << Ngw << " rad/s^2/sqrt(Hz)" << endl;
     cout << "IMU accelerometer noise: " << Na << " m/s^2/sqrt(Hz)" << endl;
     cout << "IMU accelerometer walk: " << Naw << " m/s^3/sqrt(Hz)" << endl;
-
+#endif // __ANDROID__
     mpImuCalib = new IMU::Calib(Tbc,Ng*sf,Na*sf,Ngw/sf,Naw/sf);
 
     mpImuPreintegratedFromLastKF = new IMU::Preintegrated(IMU::Bias(),*mpImuCalib);
@@ -1226,6 +1325,7 @@ void Tracking::SetLoopClosing(LoopClosing *pLoopClosing)
     mpLoopClosing=pLoopClosing;
 }
 
+#if defined(WITH_VIEWER) && WITH_VIEWER
 void Tracking::SetViewer(Viewer *pViewer)
 {
     mpViewer=pViewer;
@@ -1235,7 +1335,7 @@ void Tracking::SetStepByStep(bool bSet)
 {
     bStepByStep = bSet;
 }
-
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
 
 cv::Mat Tracking::GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat &imRectRight, const double &timestamp, string filename)
@@ -1404,7 +1504,7 @@ void Tracking::PreintegrateIMU()
 
     mvImuFromLastFrame.clear();
     mvImuFromLastFrame.reserve(mlQueueImuData.size());
-    if(mlQueueImuData.size() == 0)
+    if(mlQueueImuData.empty())
     {
         Verbose::PrintMess("Not IMU data in mlQueueImuData!!", Verbose::VERBOSITY_NORMAL);
         mCurrentFrame.setIntegrated();
@@ -1486,8 +1586,9 @@ void Tracking::PreintegrateIMU()
             tstep = mCurrentFrame.mTimeStamp-mCurrentFrame.mpPrevFrame->mTimeStamp;
         }
 
-        if (!mpImuPreintegratedFromLastKF)
-            cout << "mpImuPreintegratedFromLastKF does not exist" << endl;
+        if (!mpImuPreintegratedFromLastKF) {
+            LOGD("mpImuPreintegratedFromLastKF does not exist");
+        }
         mpImuPreintegratedFromLastKF->IntegrateNewMeasurement(acc,angVel,tstep);
         pImuPreintegratedFromLastFrame->IntegrateNewMeasurement(acc,angVel,tstep);
     }
@@ -1550,8 +1651,9 @@ bool Tracking::PredictStateIMU()
         mCurrentFrame.mPredBias = mCurrentFrame.mImuBias;
         return true;
     }
-    else
-        cout << "not IMU prediction!!" << endl;
+    else {
+        LOGW("not IMU prediction!!");
+    }
 
     return false;
 }
@@ -1659,17 +1761,18 @@ void Tracking::ComputeVelocitiesAccBias(const vector<Frame*> &vpFs, float &bax, 
 
 void Tracking::Track()
 {
-
+#if defined(WITH_VIEWER) && WITH_VIEWER
     if (bStepByStep)
     {
         while(!mbStep)
             usleep(500);
         mbStep = false;
     }
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
     if(mpLocalMapper->mbBadImu)
     {
-        cout << "TRACK: Reset map because local mapper set the bad imu flag " << endl;
+        LOGW("TRACK: Reset map because local mapper set the bad imu flag ");
         mpSystem->ResetActiveMap();
         return;
     }
@@ -1680,7 +1783,7 @@ void Tracking::Track()
     {
         if(mLastFrame.mTimeStamp>mCurrentFrame.mTimeStamp)
         {
-            cerr << "ERROR: Frame with a timestamp older than previous frame detected!" << endl;
+            LOGE("ERROR: Frame with a timestamp older than previous frame detected!");
             unique_lock<mutex> lock(mMutexImuQueue);
             mlQueueImuData.clear();
             CreateMapInAtlas();
@@ -1692,8 +1795,8 @@ void Tracking::Track()
         else if(mCurrentFrame.mTimeStamp>mLastFrame.mTimeStamp+1.0)
         #endif
         {
-            cout << "id last: " << mLastFrame.mnId << "    id curr: " << mCurrentFrame.mnId << endl;
-            std::cout << "Timestamp diff: " << mCurrentFrame.mTimeStamp - mLastFrame.mTimeStamp << std::endl;
+            LOGD("id last: %lu, id curr: %lu", mLastFrame.mnId, mCurrentFrame.mnId);
+            LOGD("Timestamp diff: %lf", mCurrentFrame.mTimeStamp - mLastFrame.mTimeStamp);
             if(mpAtlas->isInertial())
             {
                 #ifdef COVINS_MOD
@@ -1706,7 +1809,7 @@ void Tracking::Track()
                 #endif
                 if(mpAtlas->isImuInitialized())
                 {
-                    cout << "Timestamp jump detected. State set to LOST. Reseting IMU integration..." << endl;
+                    LOGW("Timestamp jump detected. State set to LOST. Resetting IMU integration...");
                     if(!pCurrentMap->GetIniertialBA2())
                     {
                         mpSystem->ResetActiveMap();
@@ -1718,7 +1821,7 @@ void Tracking::Track()
                 }
                 else
                 {
-                    cout << "Timestamp jump detected, before IMU initialization. Reseting..." << endl;
+                    LOGW("Timestamp jump detected, before IMU initialization. Resetting...");
                     mpSystem->ResetActiveMap();
                 }
             }
@@ -1763,7 +1866,7 @@ void Tracking::Track()
     int nMapChangeIndex = pCurrentMap->GetLastMapChange();
     if(nCurMapChangeIndex>nMapChangeIndex)
     {
-        // cout << "Map update detected" << endl;
+        LOGD("Map update detected");
         pCurrentMap->SetLastMapChange(nCurMapChangeIndex);
         mbMapUpdated = true;
     }
@@ -1778,7 +1881,9 @@ void Tracking::Track()
             MonocularInitialization();
         }
 
+#if defined(WITH_VIEWER) && WITH_VIEWER
         mpFrameDrawer->Update(this);
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
         if(mState!=OK) // If rightly initialized, mState=OK
         {
@@ -1841,7 +1946,7 @@ void Tracking::Track()
                     }
                     else if(pCurrentMap->KeyFramesInMap()>10)
                     {
-                        cout << "KF in map: " << pCurrentMap->KeyFramesInMap() << endl;
+                        LOGD("KF in map: %lu", pCurrentMap->KeyFramesInMap());
                         mState = RECENTLY_LOST;
                         mTimeStampLost = mCurrentFrame.mTimeStamp;
                         //mCurrentFrame.SetPose(mLastFrame.mTcw);
@@ -1894,12 +1999,12 @@ void Tracking::Track()
                     if (pCurrentMap->KeyFramesInMap()<10)
                     {
                         mpSystem->ResetActiveMap();
-                        cout << "Reseting current map..." << endl;
+                        LOGD("Reseting current map...");
                     }else
                         CreateMapInAtlas();
 
                     if(mpLastKeyFrame)
-                        mpLastKeyFrame = static_cast<KeyFrame*>(NULL);
+                        mpLastKeyFrame = static_cast<KeyFrame*>(nullptr);
 
                     Verbose::PrintMess("done", Verbose::VERBOSITY_NORMAL);
 
@@ -2003,7 +2108,7 @@ void Tracking::Track()
 
             }
             if(!bOK)
-                cout << "Fail to track local map!" << endl;
+                LOGW("Fail to track local map!");
         }
         else
         {
@@ -2023,7 +2128,7 @@ void Tracking::Track()
                 Verbose::PrintMess("Track lost for less than one second...", Verbose::VERBOSITY_NORMAL);
                 if(!pCurrentMap->isImuInitialized() || !pCurrentMap->GetIniertialBA2())
                 {
-                    cout << "IMU is not or recently initialized. Reseting active map..." << endl;
+                    LOGW("IMU is not or recently initialized. Resetting active map...");
                     mpSystem->ResetActiveMap();
                 }
 
@@ -2043,7 +2148,7 @@ void Tracking::Track()
         {
             // TODO check this situation
             Verbose::PrintMess("Saving pointer to frame. imu needs reset...", Verbose::VERBOSITY_NORMAL);
-            Frame* pF = new Frame(mCurrentFrame);
+            auto pF = new Frame(mCurrentFrame);
             pF->mpPrevFrame = new Frame(mLastFrame);
 
             // Load preintegration
@@ -2056,7 +2161,7 @@ void Tracking::Track()
             {
                 if(mCurrentFrame.mnId==(mnLastRelocFrameId+mnFramesToResetIMU))
                 {
-                    cout << "RESETING FRAME!!!" << endl;
+                    Verbose::PrintMess("RESETING FRAME!!", Verbose::VERBOSITY_NORMAL);
                 }
                 else if(mCurrentFrame.mnId>(mnLastRelocFrameId+30))
                     mLastBias = mCurrentFrame.mImuBias;
@@ -2071,9 +2176,11 @@ void Tracking::Track()
 #endif
 
         // Update drawer
+#if defined(WITH_VIEWER) && WITH_VIEWER
         mpFrameDrawer->Update(this);
         if(!mCurrentFrame.mTcw.empty())
             mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
         if(bOK || mState==RECENTLY_LOST)
         {
@@ -2088,8 +2195,10 @@ void Tracking::Track()
             else
                 mVelocity = cv::Mat();
 
+#if defined(WITH_VIEWER) && WITH_VIEWER
             if(mSensor == System::IMU_MONOCULAR || mSensor == System::IMU_STEREO)
                 mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
             // Clean VO matches
             for(int i=0; i<mCurrentFrame.N; i++)
@@ -2099,12 +2208,12 @@ void Tracking::Track()
                     if(pMP->Observations()<1)
                     {
                         mCurrentFrame.mvbOutlier[i] = false;
-                        mCurrentFrame.mvpMapPoints[i]=static_cast<MapPoint*>(NULL);
+                        mCurrentFrame.mvpMapPoints[i]=static_cast<MapPoint*>(nullptr);
                     }
             }
 
             // Delete temporal MapPoints
-            for(list<MapPoint*>::iterator lit = mlpTemporalPoints.begin(), lend =  mlpTemporalPoints.end(); lit!=lend; lit++)
+            for (auto lit = mlpTemporalPoints.begin(), lend =  mlpTemporalPoints.end(); lit!=lend; lit++)
             {
                 MapPoint* pMP = *lit;
                 delete pMP;
@@ -2137,7 +2246,7 @@ void Tracking::Track()
             for(int i=0; i<mCurrentFrame.N;i++)
             {
                 if(mCurrentFrame.mvpMapPoints[i] && mCurrentFrame.mvbOutlier[i])
-                    mCurrentFrame.mvpMapPoints[i]=static_cast<MapPoint*>(NULL);
+                    mCurrentFrame.mvpMapPoints[i]=static_cast<MapPoint*>(nullptr);
             }
         }
 
@@ -2152,7 +2261,7 @@ void Tracking::Track()
             if ((mSensor == System::IMU_MONOCULAR) || (mSensor == System::IMU_STEREO))
                 if (!pCurrentMap->isImuInitialized())
                 {
-                    Verbose::PrintMess("Track lost before IMU initialisation, reseting...", Verbose::VERBOSITY_QUIET);
+                    Verbose::PrintMess("Track lost before IMU initialisation, resetting...", Verbose::VERBOSITY_QUIET);
                     mpSystem->ResetActiveMap();
                     return;
                 }
@@ -2201,18 +2310,18 @@ void Tracking::StereoInitialization()
         {
             if (!mCurrentFrame.mpImuPreintegrated || !mLastFrame.mpImuPreintegrated)
             {
-                cout << "not IMU meas" << endl;
+                LOGD("not IMU meas");
+                Verbose::PrintMess("not IMU meas", Verbose::VERBOSITY_DEBUG);
                 return;
             }
 
             if (cv::norm(mCurrentFrame.mpImuPreintegratedFrame->avgA-mLastFrame.mpImuPreintegratedFrame->avgA)<0.5)
             {
-                cout << "not enough acceleration" << endl;
+                LOGW("not enough acceleration: %f", cv::norm(mCurrentFrame.mpImuPreintegratedFrame->avgA-mLastFrame.mpImuPreintegratedFrame->avgA));
                 return;
             }
 
-            if(mpImuPreintegratedFromLastKF)
-                delete mpImuPreintegratedFromLastKF;
+            delete mpImuPreintegratedFromLastKF;
 
             mpImuPreintegratedFromLastKF = new IMU::Preintegrated(IMU::Bias(),*mpImuCalib);
             mCurrentFrame.mpImuPreintegrated = mpImuPreintegratedFromLastKF;
@@ -2229,12 +2338,12 @@ void Tracking::StereoInitialization()
             mCurrentFrame.SetPose(cv::Mat::eye(4,4,CV_32F));
 
         // Create KeyFrame
-        KeyFrame* pKFini = new KeyFrame(mCurrentFrame,mpAtlas->GetCurrentMap(),mpKeyFrameDB);
+        auto pKFini = new KeyFrame(mCurrentFrame,mpAtlas->GetCurrentMap(),mpKeyFrameDB);
 
         // Insert KeyFrame in the map
         mpAtlas->AddKeyFrame(pKFini);
 
-        // Create MapPoints and asscoiate to KeyFrame
+        // Create MapPoints and associate to KeyFrame
         if(!mpCamera2){
             for(int i=0; i<mCurrentFrame.N;i++)
             {
@@ -2276,8 +2385,7 @@ void Tracking::StereoInitialization()
             }
         }
 
-        Verbose::PrintMess("New Map created with " + to_string(mpAtlas->MapPointsInMap()) + " points", Verbose::VERBOSITY_QUIET);
-
+        LOGD("New Map created with %ld points", mpAtlas->MapPointsInMap());
         mpLocalMapper->InsertKeyFrame(pKFini);
 
         mLastFrame = Frame(mCurrentFrame);
@@ -2294,7 +2402,9 @@ void Tracking::StereoInitialization()
 
         mpAtlas->GetCurrentMap()->mvpKeyFrameOrigins.push_back(pKFini);
 
+#if defined(WITH_VIEWER) && WITH_VIEWER
         mpMapDrawer->SetCurrentCameraPose(mCurrentFrame.mTcw);
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
         mState=OK;
     }
@@ -2316,19 +2426,14 @@ void Tracking::MonocularInitialization()
             for(size_t i=0; i<mCurrentFrame.mvKeysUn.size(); i++)
                 mvbPrevMatched[i]=mCurrentFrame.mvKeysUn[i].pt;
 
-            if(mpInitializer)
-                delete mpInitializer;
-
+            delete mpInitializer;
             mpInitializer =  new Initializer(mCurrentFrame,1.0,200);
 
             fill(mvIniMatches.begin(),mvIniMatches.end(),-1);
 
             if (mSensor == System::IMU_MONOCULAR)
             {
-                if(mpImuPreintegratedFromLastKF)
-                {
-                    delete mpImuPreintegratedFromLastKF;
-                }
+                delete mpImuPreintegratedFromLastKF;
                 mpImuPreintegratedFromLastKF = new IMU::Preintegrated(IMU::Bias(),*mpImuCalib);
                 mCurrentFrame.mpImuPreintegrated = mpImuPreintegratedFromLastKF;
 
@@ -2341,7 +2446,7 @@ void Tracking::MonocularInitialization()
         if (((int)mCurrentFrame.mvKeys.size()<=100)||((mSensor == System::IMU_MONOCULAR)&&(mLastFrame.mTimeStamp-mInitialFrame.mTimeStamp>1.0)))
         {
             delete mpInitializer;
-            mpInitializer = static_cast<Initializer*>(NULL);
+            mpInitializer = nullptr;
             fill(mvIniMatches.begin(),mvIniMatches.end(),-1);
 
             return;
@@ -2355,7 +2460,7 @@ void Tracking::MonocularInitialization()
         if(nmatches<100)
         {
             delete mpInitializer;
-            mpInitializer = static_cast<Initializer*>(NULL);
+            mpInitializer = static_cast<Initializer*>(nullptr);
             fill(mvIniMatches.begin(),mvIniMatches.end(),-1);
             return;
         }
@@ -2397,7 +2502,7 @@ void Tracking::CreateInitialMapMonocular()
     KeyFrame* pKFcur = new KeyFrame(mCurrentFrame,mpAtlas->GetCurrentMap(),mpKeyFrameDB);
 
     if(mSensor == System::IMU_MONOCULAR)
-        pKFini->mpImuPreintegrated = (IMU::Preintegrated*)(NULL);
+        pKFini->mpImuPreintegrated = nullptr;
 
 
     pKFini->ComputeBoW();
@@ -2518,7 +2623,9 @@ void Tracking::CreateInitialMapMonocular()
 
     mpAtlas->SetReferenceMapPoints(mvpLocalMapPoints);
 
+#if defined(WITH_VIEWER) && WITH_VIEWER
     mpMapDrawer->SetCurrentCameraPose(pKFcur->GetPose());
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
     mpAtlas->GetCurrentMap()->mvpKeyFrameOrigins.push_back(pKFini);
 
@@ -2548,7 +2655,7 @@ void Tracking::CreateMapInAtlas()
     {
         if(mpInitializer)
             delete mpInitializer;
-        mpInitializer = static_cast<Initializer*>(NULL);
+        mpInitializer = static_cast<Initializer*>(nullptr);
     }
 
     if((mSensor == System::IMU_MONOCULAR || mSensor == System::IMU_STEREO ) && mpImuPreintegratedFromLastKF)
@@ -2558,10 +2665,10 @@ void Tracking::CreateMapInAtlas()
     }
 
     if(mpLastKeyFrame)
-        mpLastKeyFrame = static_cast<KeyFrame*>(NULL);
+        mpLastKeyFrame = nullptr;
 
     if(mpReferenceKF)
-        mpReferenceKF = static_cast<KeyFrame*>(NULL);
+        mpReferenceKF = nullptr;
 
     mLastFrame = Frame();
     mCurrentFrame = Frame();
@@ -2603,7 +2710,7 @@ bool Tracking::TrackReferenceKeyFrame()
 
     if(nmatches<15)
     {
-        cout << "TRACK_REF_KF: Less than 15 matches!!\n";
+        LOGW("TRACK_REF_KF: Less than 15 matches!!");
         return false;
     }
 
@@ -2626,7 +2733,7 @@ bool Tracking::TrackReferenceKeyFrame()
             {
                 MapPoint* pMP = mCurrentFrame.mvpMapPoints[i];
 
-                mCurrentFrame.mvpMapPoints[i]=static_cast<MapPoint*>(NULL);
+                mCurrentFrame.mvpMapPoints[i]=static_cast<MapPoint*>(nullptr);
                 mCurrentFrame.mvbOutlier[i]=false;
                 if(i < mCurrentFrame.Nleft){
                     pMP->mbTrackInView = false;
@@ -2739,7 +2846,7 @@ bool Tracking::TrackWithMotionModel()
     }
 
 
-    fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
+    fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(nullptr));
 
     // Project points seen in previous frame
     int th;
@@ -2755,7 +2862,7 @@ bool Tracking::TrackWithMotionModel()
     if(nmatches<20)
     {
         Verbose::PrintMess("Not enough matches, wider window search!!", Verbose::VERBOSITY_NORMAL);
-        fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(NULL));
+        fill(mCurrentFrame.mvpMapPoints.begin(),mCurrentFrame.mvpMapPoints.end(),static_cast<MapPoint*>(nullptr));
 
         nmatches = matcher.SearchByProjection(mCurrentFrame,mLastFrame,2*th,mSensor==System::MONOCULAR || mSensor==System::IMU_MONOCULAR);
         Verbose::PrintMess("Matches with wider search: " + to_string(nmatches), Verbose::VERBOSITY_NORMAL);
@@ -2784,7 +2891,7 @@ bool Tracking::TrackWithMotionModel()
             {
                 MapPoint* pMP = mCurrentFrame.mvpMapPoints[i];
 
-                mCurrentFrame.mvpMapPoints[i]=static_cast<MapPoint*>(NULL);
+                mCurrentFrame.mvpMapPoints[i]=static_cast<MapPoint*>(nullptr);
                 mCurrentFrame.mvbOutlier[i]=false;
                 if(i < mCurrentFrame.Nleft){
                     pMP->mbTrackInView = false;
@@ -2910,7 +3017,7 @@ bool Tracking::TrackLocalMap()
                     mnMatchesInliers++;
             }
             else if(mSensor==System::STEREO)
-                mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint*>(NULL);
+                mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint*>(nullptr);
         }
     }
 
@@ -3121,7 +3228,7 @@ void Tracking::CreateNewKeyFrame()
         mpImuPreintegratedFromLastKF = new IMU::Preintegrated(pKF->GetImuBias(),pKF->mImuCalib);
     }
 
-    if(mSensor!=System::MONOCULAR && mSensor != System::IMU_MONOCULAR) // TODO check if incluide imu_stereo
+    if(mSensor!=System::MONOCULAR && mSensor != System::IMU_MONOCULAR) // TODO check if include imu_stereo
     {
         mCurrentFrame.UpdatePoseMatrices();
         // cout << "create new MPs" << endl;
@@ -3161,7 +3268,7 @@ void Tracking::CreateNewKeyFrame()
                 else if(pMP->Observations()<1)
                 {
                     bCreateNew = true;
-                    mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint*>(NULL);
+                    mCurrentFrame.mvpMapPoints[i] = static_cast<MapPoint*>(nullptr);
                 }
 
                 if(bCreateNew)
@@ -3230,7 +3337,7 @@ void Tracking::SearchLocalPoints()
         {
             if(pMP->isBad())
             {
-                *vit = static_cast<MapPoint*>(NULL);
+                *vit = static_cast<MapPoint*>(nullptr);
             }
             else
             {
@@ -3353,7 +3460,7 @@ void Tracking::UpdateLocalKeyFrames()
                 }
                 else
                 {
-                    mCurrentFrame.mvpMapPoints[i]=NULL;
+                    mCurrentFrame.mvpMapPoints[i]=nullptr;
                 }
             }
         }
@@ -3376,7 +3483,7 @@ void Tracking::UpdateLocalKeyFrames()
                 }
                 else
                 {
-                    mLastFrame.mvpMapPoints[i]=NULL;
+                    mLastFrame.mvpMapPoints[i]=nullptr;
                 }
             }
         }
@@ -3384,7 +3491,7 @@ void Tracking::UpdateLocalKeyFrames()
 
 
     int max=0;
-    KeyFrame* pKFmax= static_cast<KeyFrame*>(NULL);
+    KeyFrame* pKFmax= static_cast<KeyFrame*>(nullptr);
 
     mvpLocalKeyFrames.clear();
     mvpLocalKeyFrames.reserve(3*keyframeCounter.size());
@@ -3590,7 +3697,7 @@ bool Tracking::Relocalization()
                         sFound.insert(vvpMapPointMatches[i][j]);
                     }
                     else
-                        mCurrentFrame.mvpMapPoints[j]=NULL;
+                        mCurrentFrame.mvpMapPoints[j]=nullptr;
                 }
 
                 int nGood = Optimizer::PoseOptimization(&mCurrentFrame);
@@ -3600,7 +3707,7 @@ bool Tracking::Relocalization()
 
                 for(int io =0; io<mCurrentFrame.N; io++)
                     if(mCurrentFrame.mvbOutlier[io])
-                        mCurrentFrame.mvpMapPoints[io]=static_cast<MapPoint*>(NULL);
+                        mCurrentFrame.mvpMapPoints[io]=static_cast<MapPoint*>(nullptr);
 
                 // If few inliers, search by projection in a coarse window and optimize again
                 if(nGood<50)
@@ -3628,7 +3735,7 @@ bool Tracking::Relocalization()
 
                                 for(int io =0; io<mCurrentFrame.N; io++)
                                     if(mCurrentFrame.mvbOutlier[io])
-                                        mCurrentFrame.mvpMapPoints[io]=NULL;
+                                        mCurrentFrame.mvpMapPoints[io]=nullptr;
                             }
                         }
                     }
@@ -3652,7 +3759,7 @@ bool Tracking::Relocalization()
     else
     {
         mnLastRelocFrameId = mCurrentFrame.mnId;
-        cout << "Relocalized!!" << endl;
+        LOGD("Relocalized!!");
         return true;
     }
 
@@ -3662,12 +3769,14 @@ void Tracking::Reset(bool bLocMap)
 {
     Verbose::PrintMess("System Reseting", Verbose::VERBOSITY_NORMAL);
 
+#if defined(WITH_VIEWER) && WITH_VIEWER
     if(mpViewer)
     {
         mpViewer->RequestStop();
         while(!mpViewer->isStopped())
             usleep(3000);
     }
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
     // Reset Local Mapping
     if (!bLocMap)
@@ -3710,7 +3819,7 @@ void Tracking::Reset(bool bLocMap)
     if(mpInitializer)
     {
         delete mpInitializer;
-        mpInitializer = static_cast<Initializer*>(NULL);
+        mpInitializer = static_cast<Initializer*>(nullptr);
     }
     mbSetInit=false;
 
@@ -3721,12 +3830,14 @@ void Tracking::Reset(bool bLocMap)
     mCurrentFrame = Frame();
     mnLastRelocFrameId = 0;
     mLastFrame = Frame();
-    mpReferenceKF = static_cast<KeyFrame*>(NULL);
-    mpLastKeyFrame = static_cast<KeyFrame*>(NULL);
+    mpReferenceKF = static_cast<KeyFrame*>(nullptr);
+    mpLastKeyFrame = static_cast<KeyFrame*>(nullptr);
     mvIniMatches.clear();
 
+#if defined(WITH_VIEWER) && WITH_VIEWER
     if(mpViewer)
         mpViewer->Release();
+#endif
 
     Verbose::PrintMess("   End reseting! ", Verbose::VERBOSITY_NORMAL);
 }
@@ -3734,12 +3845,15 @@ void Tracking::Reset(bool bLocMap)
 void Tracking::ResetActiveMap(bool bLocMap)
 {
     Verbose::PrintMess("Active map Reseting", Verbose::VERBOSITY_NORMAL);
+
+#if defined(WITH_VIEWER) && WITH_VIEWER
     if(mpViewer)
     {
         mpViewer->RequestStop();
         while(!mpViewer->isStopped())
             usleep(3000);
     }
+#endif
 
     Map* pMap = mpAtlas->GetCurrentMap();
 
@@ -3778,12 +3892,12 @@ void Tracking::ResetActiveMap(bool bLocMap)
     if(mpInitializer)
     {
         delete mpInitializer;
-        mpInitializer = static_cast<Initializer*>(NULL);
+        mpInitializer = static_cast<Initializer*>(nullptr);
     }
 
     list<bool> lbLost;
     unsigned int index = mnFirstFrameId;
-    cout << "mnFirstFrameId = " << mnFirstFrameId << endl;
+    LOGV("mnFirstFrameId = %d", mnFirstFrameId);
     for(Map* pMap : mpAtlas->GetAllMaps())
     {
         if(pMap->GetAllKeyFrames().size() > 0)
@@ -3794,9 +3908,9 @@ void Tracking::ResetActiveMap(bool bLocMap)
     }
 
     int num_lost = 0;
-    cout << "mnInitialFrameId = " << mnInitialFrameId << endl;
+    LOGV("mnInitialFrameId = %d", mnInitialFrameId);
 
-    for(list<bool>::iterator ilbL = mlbLost.begin(); ilbL != mlbLost.end(); ilbL++)
+    for (auto ilbL = mlbLost.begin(); ilbL != mlbLost.end(); ilbL++)
     {
         if(index < mnInitialFrameId)
             lbLost.push_back(*ilbL);
@@ -3808,7 +3922,7 @@ void Tracking::ResetActiveMap(bool bLocMap)
 
         index++;
     }
-    cout << num_lost << " Frames set to lost" << endl;
+    LOGD("%d Frames set to lost", num_lost);
 
     mlbLost = lbLost;
 
@@ -3817,12 +3931,14 @@ void Tracking::ResetActiveMap(bool bLocMap)
 
     mCurrentFrame = Frame();
     mLastFrame = Frame();
-    mpReferenceKF = static_cast<KeyFrame*>(NULL);
-    mpLastKeyFrame = static_cast<KeyFrame*>(NULL);
+    mpReferenceKF = static_cast<KeyFrame*>(nullptr);
+    mpLastKeyFrame = static_cast<KeyFrame*>(nullptr);
     mvIniMatches.clear();
 
+#if defined(WITH_VIEWER) && WITH_VIEWER
     if(mpViewer)
         mpViewer->Release();
+#endif
 
     Verbose::PrintMess("   End reseting! ", Verbose::VERBOSITY_NORMAL);
 }

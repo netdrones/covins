@@ -126,8 +126,9 @@ auto Utils::ToCvMat31(const Vector3Type &m)->cv::Mat {
 }
 
 auto Utils::ToCvMat33(Matrix3Type &m33)->cv::Mat {
-    CHECK_EQ(3,m33.rows());
-    CHECK_EQ(3,m33.cols());
+// glog
+//    CHECK_EQ(3,m33.rows());
+//    CHECK_EQ(3,m33.cols());
     cv::Mat cvMat(3,3,CV_32F);
     for(int i=0;i<3;i++)
         for(int j=0; j<3; j++)
@@ -137,8 +138,9 @@ auto Utils::ToCvMat33(Matrix3Type &m33)->cv::Mat {
 }
 
 auto Utils::ToCvMat44(Matrix4Type &m44)->cv::Mat {
-    CHECK_EQ(4,m44.rows());
-    CHECK_EQ(4,m44.cols());
+// glog
+//    CHECK_EQ(4,m44.rows());
+//    CHECK_EQ(4,m44.cols());
     cv::Mat cvMat(4,4,CV_32F);
     for(int i=0;i<4;i++)
         for(int j=0; j<4; j++)

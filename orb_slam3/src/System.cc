@@ -21,9 +21,13 @@
 #include "System.h"
 #include "Converter.h"
 #include <thread>
+#if defined(WITH_VIEWER) && WITH_VIEWER
 #include <pangolin/pangolin.h>
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 #include <iomanip>
-#include <openssl/md5.h>
+//#include <openssl/md5.h>
+#include "md5.h"
+#include "Logger.h"
 #include <boost/serialization/base_object.hpp>
 #include <boost/serialization/string.hpp>
 #include <boost/archive/text_iarchive.hpp>
@@ -41,11 +45,23 @@ namespace ORB_SLAM3
 
 Verbose::eLevel Verbose::th = Verbose::VERBOSITY_NORMAL;
 
-System::System(const string &strVocFile, const string &strSettingsFile, const eSensor sensor,
-               const bool bUseViewer, const int initFr, const string &strSequence, const string &strLoadingFile):
-    mSensor(sensor), mpViewer(static_cast<Viewer*>(NULL)), mbReset(false), mbResetActiveMap(false),
+System::System(const string &strVocFile,
+               const string &strSettingsFile,
+               eSensor sensor,
+               bool bUseViewer,
+               int initFr,
+               const string &strSequence,
+               const string &strLoadingFile):
+    mSensor(sensor),
+#if defined(WITH_VIEWER) && WITH_VIEWER
+    mpViewer(static_cast<Viewer*>(NULL)),
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
+    mbReset(false), mbResetActiveMap(false),
     mbActivateLocalizationMode(false), mbDeactivateLocalizationMode(false)
 {
+
+    LOGD("Initialize ORB_SLAM3");
+
     // Output welcome message
     cout << endl <<
     "ORB-SLAM3 Copyright (C) 2017-2020 Carlos Campos, Richard Elvira, Juan J. Gómez, José M.M. Montiel and Juan D. Tardós, University of Zaragoza." << endl <<
@@ -68,28 +84,52 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         cout << "Stereo-Inertial" << endl;
 
     //Check settings file
-    cv::FileStorage fsSettings(strSettingsFile.c_str(), cv::FileStorage::READ);
+    cv::FileStorage fsSettings(strSettingsFile, cv::FileStorage::READ);
     if(!fsSettings.isOpened())
     {
-       cerr << "Failed to open settings file at: " << strSettingsFile << endl;
-       exit(-1);
+        LOGE("Failed to open settings file at: %s", strSettingsFile.c_str());
+        exit(-1);
     }
 
-    bool loadedAtlas = false;
+    cv::FileNode node = fsSettings["File.version"];
+    if(!node.empty() && node.isString() && node.string() == "1.0"){
+        settings_ = new Settings(strSettingsFile,mSensor);
+
+//        mStrLoadAtlasFromFile = settings_->atlasLoadFile();
+//        mStrSaveAtlasToFile = settings_->atlasSaveFile();
+//        cout << (*settings_) << endl;
+    }
+#if 0
+    else{
+        settings_ = nullptr;
+        cv::FileNode node = fsSettings["System.LoadAtlasFromFile"];
+        if(!node.empty() && node.isString())
+        {
+            mStrLoadAtlasFromFile = (string)node;
+        }
+
+        node = fsSettings["System.SaveAtlasToFile"];
+        if(!node.empty() && node.isString())
+        {
+            mStrSaveAtlasToFile = (string)node;
+        }
+    }
+#endif // if 0
+
+//    bool loadedAtlas = false;
 
     //----
     //Load ORB Vocabulary
-    cout << endl << "Loading ORB Vocabulary. This could take a while..." << endl;
+    LOGD("Loading ORB Vocabulary. This could take a while...");
 
     mpVocabulary = new ORBVocabulary();
     bool bVocLoad = mpVocabulary->loadFromTextFile(strVocFile);
     if(!bVocLoad)
     {
-        cerr << "Wrong path to vocabulary. " << endl;
-        cerr << "Falied to open at: " << strVocFile << endl;
+        LOGE("Failed to open at: %s", strVocFile.c_str());
         exit(-1);
     }
-    cout << "Vocabulary loaded!" << endl << endl;
+    LOGD("Vocabulary loaded!");
 
     //Create KeyFrame Database
     mpKeyFrameDatabase = new KeyFrameDatabase(*mpVocabulary);
@@ -101,32 +141,42 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         mpAtlas->SetInertialSensor();
 
     //Create Drawers. These are used by the Viewer
+#if defined(WITH_VIEWER) && WITH_VIEWER
     mpFrameDrawer = new FrameDrawer(mpAtlas);
     mpMapDrawer = new MapDrawer(mpAtlas, strSettingsFile);
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
     //Initialize the Tracking thread
     //(it will live in the main thread of execution, the one that called this constructor)
-    cout << "Seq. Name: " << strSequence << endl;
+//    cout << "Seq. Name: " << strSequence << endl;
+//    LOGD("Seq. Name: %s", strSequence.c_str());
+#if defined(WITH_VIEWER) && WITH_VIEWER
     mpTracker = new Tracking(this, mpVocabulary, mpFrameDrawer, mpMapDrawer,
-                             mpAtlas, mpKeyFrameDatabase, strSettingsFile, mSensor, strSequence);
+                             mpAtlas, mpKeyFrameDatabase, strSettingsFile, mSensor, settings_, strSequence);
+#else
+    mpTracker = new Tracking(this, mpVocabulary,
+                             mpAtlas, mpKeyFrameDatabase, strSettingsFile, mSensor, settings_, strSequence);
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
     //Initialize the Local Mapping thread and launch
     mpLocalMapper = new LocalMapping(this, mpAtlas, mSensor==MONOCULAR || mSensor==IMU_MONOCULAR, mSensor==IMU_MONOCULAR || mSensor==IMU_STEREO, strSequence);
     mptLocalMapping = new thread(&ORB_SLAM3::LocalMapping::Run,mpLocalMapper);
     mpLocalMapper->mThFarPoints = fsSettings["thFarPoints"];
-    if(mpLocalMapper->mThFarPoints!=0)
-    {
-        cout << "Discard points further than " << mpLocalMapper->mThFarPoints << " m from current camera" << endl;
+    if (mpLocalMapper->mThFarPoints!=0) {
+        LOGD("Discard points further than %f m from current camera", mpLocalMapper->mThFarPoints);
         mpLocalMapper->mbFarPoints = true;
-    }
-    else
+    } else {
         mpLocalMapper->mbFarPoints = false;
+    }
 
     //Initialize the Loop Closing thread and launch
     mpLoopCloser = new LoopClosing(mpAtlas, mpKeyFrameDatabase, mpVocabulary, mSensor!=MONOCULAR); // mSensor!=MONOCULAR);
     mptLoopClosing = new thread(&ORB_SLAM3::LoopClosing::Run, mpLoopCloser);
 
     //Initialize the Viewer thread and launch
+
+
+#if defined(WITH_VIEWER) && WITH_VIEWER
     if(bUseViewer)
     {
         mpViewer = new Viewer(this, mpFrameDrawer,mpMapDrawer,mpTracker,strSettingsFile);
@@ -135,6 +185,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         mpLoopCloser->mpViewer = mpViewer;
         mpViewer->both = mpFrameDrawer->both;
     }
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
     //Set pointers between threads
     mpTracker->SetLocalMapper(mpLocalMapper);
@@ -165,17 +216,17 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     #endif
 
     #ifdef COVINS_MOD
-    std::cout << ">>> COVINS: Initialize communicator" << std::endl;
+    LOGD("COVINS: Initialize communicator");
     comm_.reset(new Communicator(covins_params::sys::server_ip,covins_params::sys::port,mpAtlas));
-    std::cout << ">>> COVINS: Start comm thread" << std::endl;
+    LOGD("COVINS: Start comm thread");
     thread_comm_.reset(new std::thread(&Communicator::Run,comm_));
 
     // Get ID from back-end
-    std::cout << ">>> COVINS: wait for back-end response" << std::endl;
+    LOGD("COVINS: wait for back-end response");
     while(comm_->GetClientId() < 0){
         usleep(1000); //wait until ID is received from server
     }
-    std::cout << ">>> COVINS: client id: " << comm_->GetClientId() << std::endl;
+    LOGD("COVINS: client id: %d", comm_->GetClientId());
 
     // Pass to mapping
     mpLocalMapper->SetComm(comm_);
@@ -183,16 +234,15 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
 
     // Fix verbosity
     Verbose::SetTh(Verbose::VERBOSITY_QUIET);
-
 }
 
 cv::Mat System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp, const vector<IMU::Point>& vImuMeas, string filename)
 {
     if(mSensor!=STEREO && mSensor!=IMU_STEREO)
     {
-        cerr << "ERROR: you called TrackStereo but input sensor was not set to Stereo nor Stereo-Inertial." << endl;
-        exit(-1);
-    }   
+        LOGE("ERROR: you called TrackStereo but input sensor was not set to Stereo nor Stereo-Inertial.");
+        return {};
+    }
 
     // Check mode change
     {
@@ -224,7 +274,7 @@ cv::Mat System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const
         if(mbReset)
         {
             mpTracker->Reset();
-            cout << "Reset stereo..." << endl;
+            LOGD("Reset stereo...");
             mbReset = false;
             mbResetActiveMap = false;
         }
@@ -419,12 +469,14 @@ void System::Shutdown()
     #else
     mpLoopCloser->RequestFinish();
     #endif
+#if defined(WITH_VIEWER) && WITH_VIEWER
     if(mpViewer)
     {
         mpViewer->RequestFinish();
         while(!mpViewer->isFinished())
             usleep(5000);
     }
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
     // Wait until all thread have effectively stopped
     #ifdef COVINS_MOD
@@ -438,14 +490,13 @@ void System::Shutdown()
     #endif
     {
         if(!mpLocalMapper->isFinished())
-            cout << "mpLocalMapper is not finished" << endl;
+            LOGD("mpLocalMapper is not finished");
         #ifdef COVINS_MOD
 //        #ifndef NO_LOOP_FINDER
         if(!mpLoopCloser->isFinished())
-            cout << "mpLoopCloser is not finished" << endl;
+            LOGD("mpLoopCloser is not finished");
         if(mpLoopCloser->isRunningGBA()){
-            cout << "mpLoopCloser is running GBA" << endl;
-            cout << "break anyway..." << endl;
+            LOGD("mpLoopCloser is running GBA, break anyway...");
             break;
         }
 //        #endif
@@ -477,15 +528,19 @@ void System::Shutdown()
     mptLoopClosing->join();
     std::cout << "--> Join Comm Thread" << std::endl;
     thread_comm_->join();
+#if defined(WITH_VIEWER) && WITH_VIEWER
     if(mpViewer) {
         std::cout << "--> Join Viewer Thread" << std::endl;
         mptViewer->join();
     }
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
     std::cout << "Done" << std::endl;
     #endif
 
+#if defined(WITH_VIEWER) && WITH_VIEWER
     if(mpViewer)
         pangolin::BindToContext("ORB-SLAM2: Map Viewer");
+#endif // defined(WITH_VIEWER) && WITH_VIEWER
 
 #ifdef REGISTER_TIMES
     mpTracker->PrintTimeStats();
@@ -822,7 +877,7 @@ bool System::isLost()
         return false;
     else
     {
-        if ((mpTracker->mState==Tracking::LOST))
+        if (mpTracker->mState == Tracking::LOST)
             return true;
         else
             return false;

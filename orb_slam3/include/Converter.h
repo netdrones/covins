@@ -26,6 +26,9 @@
 #include"Thirdparty/g2o/g2o/types/types_six_dof_expmap.h"
 #include"Thirdparty/g2o/g2o/types/types_seven_dof_expmap.h"
 
+#include "Thirdparty/Sophus/sophus/geometry.hpp"
+#include "Thirdparty/Sophus/sophus/sim3.hpp"
+
 namespace ORB_SLAM3
 {
 
@@ -43,6 +46,7 @@ public:
     static cv::Mat toCvMat(const Eigen::Matrix3d &m);
     static cv::Mat toCvMat(const Eigen::Matrix<double,3,1> &m);
     static cv::Mat toCvMat(const Eigen::MatrixXd &m);
+//    static cv::Mat toCvMat(const Sophus::SE3f& m);
 
     static cv::Mat toCvSE3(const Eigen::Matrix<double,3,3> &R, const Eigen::Matrix<double,3,1> &t);
     static cv::Mat tocvSkewMatrix(const cv::Mat &v);
@@ -55,6 +59,10 @@ public:
 
     static bool isRotationMatrix(const cv::Mat &R);
     static std::vector<float> toEuler(const cv::Mat &R);
+
+    //TODO: Sophus migration, to be deleted in the future
+    static Sophus::SE3<float> toSophus(const cv::Mat& T);
+    static Sophus::Sim3f toSophus(const g2o::Sim3& S);
 
 };
 
